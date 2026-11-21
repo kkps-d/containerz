@@ -12,7 +12,10 @@ Only build what the current step needs.
 
 ## Environment
 
-- **Development:** Docker Desktop with the WSL 2 backend, on Windows.
+- **Development:** Docker Desktop with the WSL 2 backend, on Windows. Use it for
+  builds and CPU-only tests.
+- **GPU testing:** on a native Linux host. WSL 2 has no `/dev/dri` and limited
+  Vulkan, so GPU results there don't reflect production.
 - **Architecture:** `linux/amd64` only.
 - **Registry:** none. Images stay local. Never push.
 
@@ -22,7 +25,9 @@ Only build what the current step needs.
 - **Naming:** `containerz/<image>:<tag>`, where `<image>` is the folder name.
   - `:dev` for local work.
   - `:YYYY.MM.DD` for snapshots worth keeping.
-- **User:** run as a non-root user unless a step truly needs root.
+- **User:** run as `player` (UID 1000), inherited from `containerz/base`. Root-only
+  setup goes in the entrypoint, before it drops to `player`.
+- **Line endings:** LF only (enforced by `.gitattributes`). CRLF breaks scripts.
 - **Size:** use `--no-install-recommends` and clean apt lists in the same layer.
 - **Versions:** pin package versions when stability matters, and say why in a comment.
 
