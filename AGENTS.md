@@ -12,10 +12,10 @@ Only build what the current step needs.
 
 ## Environment
 
-- **Development:** Docker Desktop with the WSL 2 backend, on Windows. Use it for
-  builds and CPU-only tests.
-- **GPU testing:** on a native Linux host. WSL 2 has no `/dev/dri` and limited
-  Vulkan, so GPU results there don't reflect production.
+- **Development:** Ubuntu 26.04 on a native Linux host with an NVIDIA GPU
+  (RTX 5080), Docker Engine and the NVIDIA Container Toolkit.
+- **WSL 2 (Docker Desktop):** builds and CPU-only tests only. It has no
+  `/dev/dri`, so gamescope can't run, and Vulkan falls back to software.
 - **Architecture:** `linux/amd64` only.
 - **Registry:** none. Images stay local. Never push.
 
@@ -41,6 +41,12 @@ Only build what the current step needs.
 | X11     | XWayland, for games that need it             |
 | Audio   | PipeWire                                     |
 | GPU     | NVIDIA now; AMD later (vendor-agnostic)      |
+| Capture | gamescope's PipeWire video stream            |
+| Input   | libei into gamescope (not yet verified)      |
+
+The streamer is [web-remote-desktop](https://github.com/kkps-d/web-remote-desktop)'s
+agent. It needs a capture mode that reads a named PipeWire stream instead of the
+GNOME ScreenCast portal.
 
 ### GPU: stay vendor-agnostic
 
