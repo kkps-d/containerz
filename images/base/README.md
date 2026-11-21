@@ -25,17 +25,21 @@ docker run --rm -it containerz/base:dev
 
 ### With SSH
 
-Pass your public key, then connect as `player`:
+The image trusts a shared dev key, `ssh/containerz_dev.pub`. Its private half
+lives at `~/.ssh/containerz_dev` on the host and is never committed.
 
 ```powershell
-docker run --rm -it -p 2222:22 -e SSH_PUBLIC_KEY="$(Get-Content ~/.ssh/id_ed25519.pub)" containerz/base:dev
+docker run -d --name cz-dev -p 2222:22 containerz/base:dev sleep infinity
 ```
 
 ```powershell
-ssh -p 2222 player@localhost
+ssh cz
 ```
 
-You can also mount a key file at `/home/player/.ssh/authorized_keys`.
+`cz` is a shortcut in `~/.ssh/config` for `player@localhost:2222` with the dev key.
+To use another port, run `ssh -p <port> -i ~/.ssh/containerz_dev player@localhost`.
+
+To trust an extra key, pass `-e SSH_PUBLIC_KEY="..."`.
 
 ## Settings
 

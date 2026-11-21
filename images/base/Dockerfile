@@ -38,6 +38,9 @@ RUN printf '%s\n' \
         > /etc/ssh/sshd_config.d/10-containerz.conf \
     && rm -f /etc/ssh/ssh_host_*
 
+# Shared development key (private half lives in ~/.ssh/containerz_dev on the host).
+COPY --chown=${UID}:${GID} --chmod=0600 ssh/containerz_dev.pub /home/${USERNAME}/.ssh/authorized_keys
+
 COPY --chmod=0755 entrypoint.sh /usr/local/bin/entrypoint.sh
 
 ENV CONTAINERZ_USER=${USERNAME}

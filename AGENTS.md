@@ -27,6 +27,8 @@ Only build what the current step needs.
   - `:YYYY.MM.DD` for snapshots worth keeping.
 - **User:** run as `player` (UID 1000), inherited from `containerz/base`. Root-only
   setup goes in the entrypoint, before it drops to `player`.
+- **SSH:** images trust the shared dev key `images/base/ssh/containerz_dev.pub`.
+  Never commit a private key.
 - **Line endings:** LF only (enforced by `.gitattributes`). CRLF breaks scripts.
 - **Size:** use `--no-install-recommends` and clean apt lists in the same layer.
 - **Versions:** pin package versions when stability matters, and say why in a comment.
