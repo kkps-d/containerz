@@ -22,28 +22,37 @@ Built in small steps: base, display, audio, GPU, games.
   PipeWire video node. Capture and shutdown issues are in the [display README](images/display/README.md).
 - **PipeWire capture:** the display image now backports the upstream loop-locking
   fix to Ubuntu's gamescope 3.16.20. The rebuilt image delivered 16 distinct
-  1280×720 `vkcube` frames on each GPU (RTX 5080 and AMD Raphael iGPU). The RTX 5080
-  still exited with status 139 on shutdown.
+  1280×720 `vkcube` frames on each GPU (RTX 5080 and AMD Raphael iGPU).
 - **`containerz/streamer`** streams `vkcube` to the existing browser client using
   the agent's named PipeWire capture. Playback, reconnecting, and resizing passed
   on both GPUs. The host LAN address also worked from the Linux host.
   [Streamer smoke test](images/streamer/README.md)
+- **Browser input** works through gamescope's EIS socket on the RTX 5080. Firefox
+  delivered keyboard input, clicks, scrolling, and both pointer modes to `xev`.
+  Absolute motion still matched the native display after resizing the stream.
+  Held input was released on channel close, viewer replacement, and shutdown.
+  With a missing EIS socket, the viewer showed the reason and the cube kept rotating.
+  The visual smoke tester runs inside XWayland and shows mouse movement and held keys.
 
 ## Findings
 
+- **RTX 5080 shutdown:** gamescope can exit with status 139 after playback. GDB
+  caught the shader compilation thread inside the NVIDIA Vulkan driver during
+  teardown. Playback, reconnect, and launcher cleanup passed. This can make a
+  normal session stop look like a crash in monitoring. Track the proposed Vulkan
+  teardown fix separately from input and audio work. [Upstream patch](https://github.com/ValveSoftware/gamescope/pull/2542)
 - **gamescope needs a real GPU** with `VK_EXT_physical_device_drm`. lavapipe and WSL 2
   both fail with that error.
 - **Weston 14** (`--backend=pipewire --renderer=pixman`) works on WSL as a fallback:
   Wayland and XWayland apps render, and `pipewiresrc target-object=weston.pipewire`
   captures it. But it has **no input path**, so it isn't a production option.
-- **Input:** the agent's uinput devices would show up on the host kernel, which is
-  unsafe with several containers. gamescope links `libeis`, so **libei** is the likely
-  route. Not verified.
+- **Input:** headless gamescope publishes `gamescope-0-ei` in `player`'s private
+  runtime directory. Browser input passed with `/dev/uinput` absent. The static
+  `xev` window needed a repaint for gamescope to send a new first frame after reconnect.
 - **Networking:** WebRTC through Docker's NAT has the same problems as VM NAT
   (see the agent's `docs/LINUX_DEV.md`). The smoke test uses host networking.
 
 ## Next steps
 
-1. Check whether gamescope accepts input through libei.
-2. Verify audio capture from a container-local PipeWire sink.
-3. Test from a second LAN device.
+1. Verify audio capture from a container-local PipeWire sink.
+2. Test from a second LAN device.

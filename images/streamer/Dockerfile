@@ -1,4 +1,4 @@
-FROM containerz/base:dev AS agent-builder
+FROM containerz/base:dev AS builder
 
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -17,15 +17,22 @@ COPY --from=streamer Cargo.toml Cargo.lock ./
 COPY --from=streamer src ./src
 RUN cargo build --locked --release
 
+COPY input-visualizer.c /build/input-visualizer.c
+RUN apt-get update && apt-get install -y --no-install-recommends libx11-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && cc -O2 -Wall -Wextra -Werror /build/input-visualizer.c -lX11 -o /build/input-visualizer
+
 FROM containerz/display:dev
 
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
         gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
         gstreamer1.0-plugins-ugly gstreamer1.0-nice gstreamer1.0-pipewire \
+        libei1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=agent-builder /build/agent/target/release/agent /usr/local/bin/agent
+COPY --from=builder /build/agent/target/release/agent /usr/local/bin/agent
+COPY --from=builder /build/input-visualizer /usr/local/bin/input-visualizer
 COPY agent.toml /etc/containerz/agent.toml
 COPY --chmod=0755 start-streamer.sh /usr/local/bin/start-streamer
 

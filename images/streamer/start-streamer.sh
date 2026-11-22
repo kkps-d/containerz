@@ -24,7 +24,7 @@ trap cleanup EXIT
 trap 'exit 0' INT TERM
 
 # These dimensions match the native source declared in agent.toml.
-DISPLAY_WIDTH=1280 DISPLAY_HEIGHT=720 start-display vkcube &
+DISPLAY_WIDTH=1280 DISPLAY_HEIGHT=720 start-display "$@" &
 display_pid=$!
 
 has_video_node() {
