@@ -6,3 +6,4 @@ pipewire_node = "gamescope"
 width_px = 1280
 height_px = 720
 eis_socket = "gamescope-0-ei"
+pipewire_audio_sink = "containerz-game-audio"

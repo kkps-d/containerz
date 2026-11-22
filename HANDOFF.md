@@ -33,6 +33,12 @@ Built in small steps: base, display, audio, GPU, games.
   Held input was released on channel close, viewer replacement, and shutdown.
   With a missing EIS socket, the viewer showed the reason and the cube kept rotating.
   The visual smoke tester runs inside XWayland and shows mouse movement and held keys.
+- **Game audio** streams the monitor of the container-local PipeWire sink as
+  Opus. On the RTX 5080, Firefox decoded the test tone after reconnecting and
+  resizing, and video and input stayed live when the sink was missing or removed.
+  The piano tester exercises audio and browser input. The browser smoke test
+  also passed from a second device using the Linux host's LAN address.
+  [Audio smoke test](images/streamer/README.md#audio)
 
 ## Findings
 
@@ -54,5 +60,4 @@ Built in small steps: base, display, audio, GPU, games.
 
 ## Next steps
 
-1. Verify audio capture from a container-local PipeWire sink.
-2. Test from a second LAN device.
+1. Stream a game and verify video, audio, and controls on both GPUs.

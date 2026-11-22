@@ -13,10 +13,18 @@ case ${1:-} in
         command=(start-streamer input-visualizer)
         shift
         ;;
+    --audio-test)
+        command=(start-streamer audio-test)
+        shift
+        ;;
+    --piano-test)
+        command=(start-streamer piano-tester)
+        shift
+        ;;
 esac
 
 if (( $# < 2 || $# > 3 )); then
-    fail 'usage: bash scripts/smoke-streamer.sh [--input-test|--visual-input-test] nvidia|amd PCI_ADDRESS [WEB_REMOTE_DESKTOP_DIR]'
+    fail 'usage: bash scripts/smoke-streamer.sh [--audio-test|--input-test|--piano-test|--visual-input-test] nvidia|amd PCI_ADDRESS [WEB_REMOTE_DESKTOP_DIR]'
 fi
 
 gpu=$1

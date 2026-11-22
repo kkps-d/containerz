@@ -2,7 +2,8 @@
 
 Headless gamescope and `vkcube` streamed by the `web-remote-desktop` agent. The
 agent runs as `player`, reads the `gamescope` PipeWire node, and sends keyboard
-and mouse input to gamescope's EIS socket in the container.
+and mouse input to gamescope's EIS socket in the container. Game audio comes
+from the monitor of the container-local `containerz-game-audio` stereo sink.
 
 ## Build
 
@@ -45,6 +46,44 @@ bash scripts/smoke-streamer.sh --visual-input-test nvidia 0000:01:00.0
 Use `--input-test` to run `xev` and print the raw X11 events to the terminal.
 The static `xev` window can need a repaint before gamescope sends a new first
 frame after reconnecting.
+
+### Audio
+
+```bash
+bash scripts/smoke-streamer.sh --audio-test nvidia 0000:01:00.0
+```
+
+Connect and choose **Unmute audio** in the browser toolbar. You should hear a
+quiet 440 Hz tone about every second and a half while the visual tester responds
+to input. Try mute and reconnect, then press Ctrl+C to stop the test.
+
+The streamer starts PipeWire PulseAudio inside the container and directs game
+clients to its private socket and sink. The agent reads only the sink named by
+`[capture].pipewire_audio_sink`. If audio is unavailable, stream info reports
+the reason and video and input continue.
+
+### Piano
+
+```bash
+bash scripts/smoke-streamer.sh --piano-test nvidia 0000:01:00.0
+```
+
+Unmute audio, then click the stream and play the C3–C5 keyboard. Use Absolute
+mouse mode for clicks and drags, or play chords with the computer keys marked
+on the piano. Keys light up while held. **Touch contacts** counts independent
+touches that reach the app. The current gamescope streamer sends touchscreen
+gestures as mouse input, so that counter stays at zero over this connection.
+
+To test native multitouch directly on a Linux touchscreen desktop, build the
+same app locally with `libsdl3-dev` installed.
+
+```bash
+cc -O2 images/streamer/piano-tester.c $(pkg-config --cflags --libs sdl3) -lm -o /tmp/piano-tester
+/tmp/piano-tester
+```
+
+Hold two notes with two fingers, then lift one. The other key should stay lit
+and keep sounding while the contact count drops from two to one.
 
 For a second device on the LAN, use the Linux host's LAN address for both
 ports. Run this smoke test on a trusted LAN because it uses unauthenticated
