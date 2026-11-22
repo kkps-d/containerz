@@ -1,8 +1,5 @@
 # display
 
-> [!WARNING]
-> Work in progress. Builds, but gamescope fails on WSL 2. Test on a Linux host with a GPU.
-
 Headless gamescope (Wayland + XWayland) with a PipeWire session, built on `containerz/base`.
 
 ## What's inside
@@ -14,16 +11,36 @@ Headless gamescope (Wayland + XWayland) with a PipeWire session, built on `conta
 
 ## Build
 
-```powershell
+```bash
+docker build -t containerz/base:dev images/base
 docker build -t containerz/display:dev images/display
 ```
 
-## Run
+The builder stage backports the PipeWire loop fix to Ubuntu's gamescope package
+so capture clients receive frames. Once Ubuntu ships the fix, remove the builder
+stage and install gamescope from apt again. [Gamescope 3.16.22 release](https://github.com/ValveSoftware/gamescope/releases/tag/3.16.22)
 
-Starts gamescope with `vkcube`. Pass another command to run that instead.
+## Run on NVIDIA
 
-```powershell
-docker run --rm -it containerz/display:dev
+Use a native Linux host with the NVIDIA Container Toolkit and Docker CDI enabled.
+Set `gpu_pci` to the NVIDIA GPU's PCI address from `/dev/dri/by-path`.
+
+```bash
+gpu_pci=0000:01:00.0
+video_gid=$(stat -Lc %g "/dev/dri/by-path/pci-${gpu_pci}-card")
+render_gid=$(stat -Lc %g "/dev/dri/by-path/pci-${gpu_pci}-render")
+
+docker run --rm -it --name containerz-display \
+    --device nvidia.com/gpu=all \
+    --group-add "$video_gid" --group-add "$render_gid" \
+    containerz/display:dev
+```
+
+The default app is `vkcube`. To launch another app, append `start-display <command>`.
+While the container is running, check for `node.name = "gamescope"` and `media.class = "Video/Source"`:
+
+```bash
+docker exec --user player containerz-display pw-cli ls Node
 ```
 
 | Variable         | Default |
@@ -36,4 +53,5 @@ docker run --rm -it containerz/display:dev
 
 - **gamescope needs a GPU with a DRM device.** Without one it exits with
   `physical device doesn't support VK_EXT_physical_device_drm`. lavapipe and WSL 2 lack it.
-- Ubuntu installs gamescope in `/usr/games`, so the image adds it to `PATH`.
+- On the RTX 5080, gamescope 3.16.20 can exit with status 139 on shutdown.
+  A similar shutdown crash is tracked [upstream](https://github.com/ValveSoftware/gamescope/issues/2516).

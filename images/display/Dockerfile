@@ -1,9 +1,32 @@
 # containerz/display: headless gamescope (Wayland + XWayland) with a PipeWire session.
+FROM containerz/base:dev AS gamescope-builder
+
+USER root
+WORKDIR /build
+
+# Pin the Ubuntu source this PipeWire loop-locking backport applies to.
+ARG GAMESCOPE_SOURCE_VERSION=3.16.20+ds-1
+RUN printf '%s\n' 'deb-src http://archive.ubuntu.com/ubuntu/ resolute multiverse' \
+        > /etc/apt/sources.list.d/gamescope-source.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends build-essential dpkg-dev \
+    && apt-get build-dep -y --no-install-recommends "gamescope=${GAMESCOPE_SOURCE_VERSION}" \
+    && apt-get source "gamescope=${GAMESCOPE_SOURCE_VERSION}" \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY patches/gamescope-pipewire-loop-locking.patch /build/
+RUN cd gamescope-*/ \
+    && patch --batch --fuzz=0 -p1 < ../gamescope-pipewire-loop-locking.patch \
+    && sed -i '1s/) /+containerz1) /' debian/changelog \
+    && DEB_BUILD_OPTIONS=nocheck dpkg-buildpackage -b -uc -us -j8 \
+    && install -D -m 0644 ../gamescope_*_amd64.deb /packages/gamescope.deb
+
 FROM containerz/base:dev
 
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        gamescope xwayland \
+RUN --mount=type=bind,from=gamescope-builder,source=/packages,target=/packages \
+    apt-get update && apt-get install -y --no-install-recommends \
+        /packages/gamescope.deb xwayland \
         libvulkan1 mesa-vulkan-drivers libegl1 libgl1 libgles2 \
         pipewire pipewire-bin wireplumber dbus-daemon dbus-user-session \
         vulkan-tools mesa-utils x11-utils \

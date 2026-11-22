@@ -51,4 +51,5 @@ To trust an extra key, pass `-e SSH_PUBLIC_KEY="..."`.
 ## Notes
 
 - The entrypoint starts as root so it can start sshd, then switches to `player`.
+- The container command keeps supplementary groups passed with Docker's `--group-add`, excluding group 0.
 - `ssh` (the client) is present because Ubuntu's server package depends on it.

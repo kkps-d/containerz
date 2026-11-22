@@ -24,5 +24,14 @@ if [ "${ENABLE_SSH:-0}" = "1" ]; then
     /usr/sbin/sshd
 fi
 
-exec setpriv --reuid="$user" --regid="$user" --init-groups \
+# Preserve groups supplied by Docker for device access when switching users.
+read -r -a groups <<< "$(id -G "$user")"
+for group in $(id -G); do
+    if [ "$group" != 0 ]; then
+        groups+=("$group")
+    fi
+done
+group_list=$(IFS=,; printf '%s' "${groups[*]}")
+
+exec setpriv --reuid="$user" --regid="$user" --groups="$group_list" \
     env HOME="$home" USER="$user" "$@"

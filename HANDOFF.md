@@ -1,6 +1,6 @@
 # Handoff: moving to the Linux host
 
-Summary of the first session (on Windows + WSL 2), for picking up on the Linux machine.
+Summary of the WSL 2 work and the first native Linux display test.
 Rules and conventions are in [AGENTS.md](AGENTS.md); this file is only the story so far.
 Delete it once it's no longer useful.
 
@@ -17,8 +17,13 @@ Built in small steps: base, display, audio, GPU, games.
 - **Dev SSH key:** the image trusts `images/base/ssh/containerz_dev.pub`. The private
   key is `~/.ssh/containerz_dev` on the Windows machine. Copy it over, or make a new
   pair and replace the `.pub`.
-- **`containerz/display`** (work in progress): gamescope headless + XWayland + PipeWire.
-  Builds, but never ran: WSL 2 has no GPU DRM device.
+- **`containerz/display`** builds and runs on the RTX 5080. With NVIDIA CDI and the
+  GPU's DRM groups, `vkcube` renders through XWayland and gamescope publishes a
+  PipeWire video node. Capture and shutdown issues are in the [display README](images/display/README.md).
+- **PipeWire capture:** the display image now backports the upstream loop-locking
+  fix to Ubuntu's gamescope 3.16.20. The rebuilt image delivered 16 distinct
+  1280×720 `vkcube` frames on each GPU (RTX 5080 and AMD Raphael iGPU). The RTX 5080
+  still exited with status 139 on shutdown.
 
 ## Findings
 
@@ -38,10 +43,5 @@ Built in small steps: base, display, audio, GPU, games.
 
 ## Next steps
 
-1. Set up the host: NVIDIA `-open` driver via `ubuntu-drivers`, Docker Engine, NVIDIA
-   Container Toolkit (`NVIDIA_DRIVER_CAPABILITIES=all`). Monitor on the RTX 5080, not the
-   AMD iGPU.
-2. Run `containerz/display` with `--gpus all`. Confirm gamescope starts, `vkcube` renders,
-   and gamescope publishes a PipeWire video stream (`pw-cli ls Node`).
-3. Check whether gamescope accepts input through libei.
-4. Then: add the PipeWire-node capture mode to the agent, package it, solve networking.
+1. Check whether gamescope accepts input through libei.
+2. Add the PipeWire-node capture mode to the agent, package it, and test networking.

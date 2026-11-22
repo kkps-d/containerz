@@ -1,0 +1,48 @@
+From e3ed1ea7e66aaf12d325679548cdfd29919cf935 Mon Sep 17 00:00:00 2001
+From: Autumn Ashton <misyl@froggi.es>
+Date: Sun, 15 Mar 2026 10:03:06 +0000
+Subject: [PATCH] pipewire: Fix pipewire loop locking
+
+https://gitlab.freedesktop.org/pipewire/pipewire/-/issues/5148
+---
+ src/pipewire.cpp | 18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
+
+diff --git a/src/pipewire.cpp b/src/pipewire.cpp
+index 1f93cb8a5..7a44c4efa 100644
+--- a/src/pipewire.cpp
++++ b/src/pipewire.cpp
+@@ -642,7 +642,9 @@ static void run_pipewire(struct pipewire_state *state)
+ 		assert(!(pollfds[EVENT_NUDGE].revents & POLLHUP));
+ 
+ 		if (pollfds[EVENT_PIPEWIRE].revents & POLLIN) {
++			pw_loop_enter(state->loop);
+ 			ret = pw_loop_iterate(state->loop, -1);
++			pw_loop_leave(state->loop);
+ 			if (ret < 0) {
+ 				pwr_log.errorf("pw_loop_iterate failed");
+ 				break;
+@@ -720,12 +722,18 @@ bool init_pipewire(void)
+ 	}
+ 
+ 	state->running = true;
++	ret = 0;
++	pw_loop_enter(state->loop);
+ 	while (state->stream_node_id == SPA_ID_INVALID) {
+-		int ret = pw_loop_iterate(state->loop, -1);
+-		if (ret < 0) {
+-			pwr_log.errorf("pw_loop_iterate failed");
+-			return false;
+-		}
++		ret = pw_loop_iterate(state->loop, -1);
++		if (ret < 0)
++			break;
++	}
++	pw_loop_leave(state->loop);
++
++	if (ret < 0) {
++		pwr_log.errorf("pw_loop_iterate failed");
++		return false;
+ 	}
+ 
+ 	pwr_log.infof("stream available on node ID: %u", state->stream_node_id);
