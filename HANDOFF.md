@@ -24,6 +24,10 @@ Built in small steps: base, display, audio, GPU, games.
   fix to Ubuntu's gamescope 3.16.20. The rebuilt image delivered 16 distinct
   1280×720 `vkcube` frames on each GPU (RTX 5080 and AMD Raphael iGPU). The RTX 5080
   still exited with status 139 on shutdown.
+- **`containerz/streamer`** streams `vkcube` to the existing browser client using
+  the agent's named PipeWire capture. Playback, reconnecting, and resizing passed
+  on both GPUs. The host LAN address also worked from the Linux host.
+  [Streamer smoke test](images/streamer/README.md)
 
 ## Findings
 
@@ -32,16 +36,14 @@ Built in small steps: base, display, audio, GPU, games.
 - **Weston 14** (`--backend=pipewire --renderer=pixman`) works on WSL as a fallback:
   Wayland and XWayland apps render, and `pipewiresrc target-object=weston.pipewire`
   captures it. But it has **no input path**, so it isn't a production option.
-- **The agent needs a new capture mode.** Today it uses GNOME's ScreenCast portal. In a
-  container it should read a named PipeWire video stream (gamescope's or Weston's)
-  with `pipewiresrc` directly. Its PipeWire audio capture should mostly work as is.
 - **Input:** the agent's uinput devices would show up on the host kernel, which is
   unsafe with several containers. gamescope links `libeis`, so **libei** is the likely
   route. Not verified.
 - **Networking:** WebRTC through Docker's NAT has the same problems as VM NAT
-  (see the agent's `docs/LINUX_DEV.md`). Try host networking or a fixed UDP range.
+  (see the agent's `docs/LINUX_DEV.md`). The smoke test uses host networking.
 
 ## Next steps
 
 1. Check whether gamescope accepts input through libei.
-2. Add the PipeWire-node capture mode to the agent, package it, and test networking.
+2. Verify audio capture from a container-local PipeWire sink.
+3. Test from a second LAN device.

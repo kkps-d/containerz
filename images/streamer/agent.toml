@@ -1,0 +1,7 @@
+[direct]
+port = 8080
+
+[capture]
+pipewire_node = "gamescope"
+width_px = 1280
+height_px = 720
