@@ -31,8 +31,8 @@ bash scripts/smoke-streamer.sh nvidia 0000:01:00.0
 Open `http://localhost:5173`, enter `localhost:8080`, and confirm the cube
 rotates. Disconnect and reconnect, then change the resolution and check that
 video continues. Press Ctrl+C in the launcher to stop both services.
-On the RTX 5080, gamescope can report status 139 during shutdown after playback
-has completed.
+On the RTX 5080, gamescope can report status 139 during shutdown after playback.
+[Display troubleshooting](../display/README.md#known-issues)
 
 Use `--visual-input-test` to open the C/Xlib input tester. Click the streamed
 window to focus it. The tester shows a crosshair, pointer coordinates, click
@@ -86,6 +86,8 @@ Hold two notes with two fingers, then lift one. The other key should stay lit
 and keep sounding while the contact count drops from two to one.
 
 For a second device on the LAN, use the Linux host's LAN address for both
-ports. Run this smoke test on a trusted LAN because it uses unauthenticated
-HTTP signaling and host networking. Allow TCP ports 5173 and 8080 and WebRTC
-UDP traffic from the test device if the host firewall filters them.
+ports. The launcher uses host networking so browsers can reach the agent's
+WebRTC UDP ports directly, which avoids Docker bridge NAT. Run this smoke test
+on a trusted LAN because signaling uses unauthenticated HTTP. Allow TCP ports
+5173 and 8080 and WebRTC UDP traffic from the test device if the host firewall
+filters them.

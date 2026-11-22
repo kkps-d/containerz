@@ -11,6 +11,7 @@ Ubuntu 26.04 container images for running games, streamed over WebRTC.
 
 Each image lives in `images/<image>/` and has its own README.
 For the browser smoke test, see the [streamer image](images/streamer/README.md).
+For results by GPU and the checklist for adding a game, see [testing](docs/testing.md).
 
 ```powershell
 docker build -t containerz/<image>:dev images/<image>

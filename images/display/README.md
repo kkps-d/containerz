@@ -53,5 +53,8 @@ docker exec --user player containerz-display pw-cli ls Node
 
 - **gamescope needs a GPU with a DRM device.** Without one it exits with
   `physical device doesn't support VK_EXT_physical_device_drm`. lavapipe and WSL 2 lack it.
-- On the RTX 5080, gamescope 3.16.20 can exit with status 139 on shutdown.
-  A similar shutdown crash is tracked [upstream](https://github.com/ValveSoftware/gamescope/issues/2516).
+- On the RTX 5080, gamescope 3.16.20 can exit with status 139 (SIGSEGV) after
+  playback. GDB caught the shader compilation thread inside the NVIDIA Vulkan
+  driver during teardown. Record the shutdown status separately from playback
+  and launcher cleanup. [Upstream issue](https://github.com/ValveSoftware/gamescope/issues/2516) ·
+  [Proposed teardown fix](https://github.com/ValveSoftware/gamescope/pull/2542)
