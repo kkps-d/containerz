@@ -13,6 +13,11 @@ export const games = {
     image: 'containerz/openarena:dev',
     dataPath: '/home/player/.openarena',
   },
+  holocure: {
+    title: 'HoloCure',
+    image: 'containerz/holocure:dev',
+    dataPath: '/home/player/.wine-holocure',
+  },
 } as const;
 
 export type GameId = keyof typeof games;

@@ -1,7 +1,9 @@
 import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { readdir, readFile, realpath, stat } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { access, readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage } from 'node:http';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
@@ -106,6 +108,20 @@ async function gpuLaunchArguments(gpu: Gpu) {
     throw new RequestError(503, `Could not resolve the NVIDIA GPU UUID for ${gpu.pci}.`);
   }
   return ['--device', `nvidia.com/gpu=${uuid}`, ...groups];
+}
+
+async function holocureMount(dataDir: string) {
+  const directory = process.env.HOLOCURE_GAME_DIR || join(dataDir, 'holocure');
+  try {
+    const source = await realpath(directory);
+    await Promise.all(['HoloCure.exe', 'data.win'].map((file) => access(join(source, file), constants.R_OK)));
+    // Docker parses the mount fields as CSV.
+    return ['--mount', `type=bind,"src=${source.replaceAll('"', '""')}",dst=/opt/holocure,readonly`];
+  } catch (error) {
+    const { code } = error as NodeJS.ErrnoException;
+    if (code !== 'ENOENT' && code !== 'ENOTDIR' && code !== 'EACCES') throw error;
+    throw new RequestError(503, `Extract HoloCure.zip into ${directory} or set HOLOCURE_GAME_DIR to the extracted game folder.`);
+  }
 }
 
 async function streamPort(profiles: Profile[], assigned?: number) {
@@ -271,8 +287,10 @@ export function createCoordinatorServer(dataDir = fileURLToPath(new URL('./data/
         return json(200, { games: statuses, resolutions, frameRates });
       }
 
-      const action = /^\/api\/profiles\/([a-f\d-]+)\/games\/(minecraft|openarena)\/(start|stop)$/.exec(path);
-      if (request.method !== 'POST' || !action) return json(404, { message: 'Route not found.' });
+      const action = /^\/api\/profiles\/([a-f\d-]+)\/games\/([a-z\d-]+)\/(start|stop)$/.exec(path);
+      if (request.method !== 'POST' || !action || !Object.hasOwn(games, action[2])) {
+        return json(404, { message: 'Route not found.' });
+      }
 
       const [, id, gameId, operation] = action;
       const game = gameId as GameId;
@@ -288,6 +306,7 @@ export function createCoordinatorServer(dataDir = fileURLToPath(new URL('./data/
           return;
         }
         if (container) throw new RequestError(409, 'Stop this profile’s existing game before starting it again.');
+        const gameMount = game === 'holocure' ? await holocureMount(dataDir) : [];
         const gpu = (await listGpus()).find(({ pci }) => pci === settings.gpu);
         if (!gpu) throw new RequestError(400, 'The selected GPU is unavailable. Choose another GPU.');
         const gpuArgs = await gpuLaunchArguments(gpu);
@@ -306,7 +325,7 @@ export function createCoordinatorServer(dataDir = fileURLToPath(new URL('./data/
           '--stop-timeout', '15', '--ulimit', 'core=0', ...gpuArgs,
           '--env', `DISPLAY_WIDTH=${width}`, '--env', `DISPLAY_HEIGHT=${height}`,
           '--env', `DISPLAY_FPS=${settings.fps}`, '--env', `CONTAINERZ_AGENT_PORT=${port}`,
-          '--mount', `type=volume,src=${name},dst=${dataPath}`, image,
+          '--mount', `type=volume,src=${name},dst=${dataPath}`, ...gameMount, image,
         ]);
       });
 

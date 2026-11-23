@@ -39,6 +39,9 @@ where this build puts its settings and saves. The volumes
 `containerz-holocure-smoke-nvidia` and `containerz-holocure-smoke-amd`
 keep their respective saves across container recreation.
 
+The [game coordinator](../../game-coordinator-small/README.md) also launches
+HoloCure and keeps a separate Wine volume for each profile.
+
 The launcher starts the Wine server outside gamescope's process tree and
 stops it after gamescope exits so Wine's device helpers can finish shutting down.
 When you quit from the game menu, the streamer reports status 1 because
