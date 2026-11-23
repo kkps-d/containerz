@@ -5,7 +5,13 @@ fail() { echo "smoke-streamer: $*" >&2; exit 1; }
 
 image=containerz/streamer:dev
 command=()
+mounts=()
 case ${1:-} in
+    --minecraft)
+        image=containerz/minecraft:dev
+        mounts=(--mount type=volume,src=containerz-minecraft-data,dst=/home/player/.local/share/PrismLauncher)
+        shift
+        ;;
     --openarena)
         image=containerz/openarena:dev
         shift
@@ -29,7 +35,7 @@ case ${1:-} in
 esac
 
 if (( $# < 2 || $# > 3 )); then
-    fail 'usage: bash scripts/smoke-streamer.sh [--openarena|--audio-test|--input-test|--piano-test|--visual-input-test] nvidia|amd PCI_ADDRESS [WEB_REMOTE_DESKTOP_DIR]'
+    fail 'usage: bash scripts/smoke-streamer.sh [--minecraft|--openarena|--audio-test|--input-test|--piano-test|--visual-input-test] nvidia|amd PCI_ADDRESS [WEB_REMOTE_DESKTOP_DIR]'
 fi
 
 gpu=$1
@@ -77,7 +83,7 @@ trap 'exit 0' INT TERM
 
 container=$(docker run -d --pull never --network host --stop-timeout 15 --ulimit core=0 \
     "${devices[@]}" --group-add "$(stat -c %g "$card")" --group-add "$(stat -c %g "$render")" \
-    "$image" "${command[@]}")
+    "${mounts[@]}" "$image" "${command[@]}")
 docker logs --follow "$container" &
 logs_pid=$!
 setsid npm --prefix "$client_dir" run dev -- --port 5173 --strictPort &
