@@ -7,9 +7,10 @@ from the monitor of the container-local `containerz-game-audio` stereo sink.
 
 ## Build
 
-Use a native Linux host with Docker, Node.js 24, and the gamescope input and
-`pipewire_cursor_socket` changes in the sibling `web-remote-desktop` checkout.
-Run these from the `containerz` root.
+Use a native Linux host with Docker and Node.js 24. The sibling
+`web-remote-desktop` checkout must support named PipeWire capture, named audio,
+gamescope input, and `pipewire_cursor_socket`. Run these commands from the
+`containerz` root.
 
 ```bash
 docker build -t containerz/base:dev images/base
