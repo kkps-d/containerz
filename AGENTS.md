@@ -12,8 +12,8 @@ Only build what the current step needs.
 
 ## Environment
 
-- **Development:** Ubuntu 26.04 on a native Linux host with an NVIDIA GPU
-  (RTX 5080), Docker Engine and the NVIDIA Container Toolkit.
+- **Development:** Ubuntu 26.04 on a native Linux host with an RTX 5080, an AMD
+  Raphael iGPU, Docker Engine, and the NVIDIA Container Toolkit.
 - **WSL 2 (Docker Desktop):** builds and CPU-only tests only. It has no
   `/dev/dri`, so gamescope can't run, and Vulkan falls back to software.
 - **Architecture:** `linux/amd64` only.
@@ -35,27 +35,28 @@ Only build what the current step needs.
 
 ## Target stack
 
-| Layer   | Choice                                       |
-| ------- | -------------------------------------------- |
-| Display | Wayland, with gamescope as the compositor    |
-| X11     | XWayland, for games that need it             |
-| Audio   | PipeWire                                     |
-| GPU     | NVIDIA now; AMD later (vendor-agnostic)      |
-| Capture | gamescope's PipeWire video stream            |
-| Input   | libei into gamescope (not yet verified)      |
+| Layer   | Choice                                            |
+| ------- | ------------------------------------------------- |
+| Display | Wayland, with gamescope as the compositor         |
+| X11     | XWayland, for games that need it                  |
+| Audio   | PipeWire sink monitor                             |
+| GPU     | NVIDIA and AMD                                    |
+| Capture | gamescope's named PipeWire video stream           |
+| Input   | Browser keyboard and mouse through gamescope EIS  |
 
-The streamer is [web-remote-desktop](https://github.com/kkps-d/web-remote-desktop)'s
-agent. It needs a capture mode that reads a named PipeWire stream instead of the
-GNOME ScreenCast portal.
+The [web-remote-desktop agent](https://github.com/kkps-d/web-remote-desktop)
+reads the named PipeWire video node and audio sink monitor. It sends browser
+keyboard and mouse input to gamescope through EIS using libei. Browser touch
+gestures can emulate mouse input.
 
 ### GPU: stay vendor-agnostic
 
-Production runs on both NVIDIA and AMD. Only NVIDIA is tested for now.
+The streamer smoke tests passed on the RTX 5080 and AMD Raphael iGPU.
+[Test results](docs/testing.md)
 
-- Don't hard-code NVIDIA in shared images. Put vendor-specific setup in its own
-  layer or at runtime (for example `--gpus all` vs `--device /dev/dri`).
+- Don't hard-code NVIDIA in shared images. Select the GPU at runtime using
+  NVIDIA CDI or the AMD GPU's DRM devices.
 - Prefer standard APIs (Vulkan, EGL, GBM) over vendor-only ones.
-- Don't add AMD validation yet.
 
 ## Layout
 
