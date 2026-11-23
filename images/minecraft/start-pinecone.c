@@ -1,4 +1,4 @@
-/* Request a frame from idle Prism windows so new viewers can start the stream. */
+/* Request a frame from idle Pinecone windows so new viewers can start the stream. */
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -17,7 +17,7 @@ static int ignore_x_error(Display *display, XErrorEvent *event)
     return 0;
 }
 
-static void repaint_prism(Display *display)
+static void repaint_pinecone(Display *display)
 {
     Window window;
     int revert_to;
@@ -27,10 +27,10 @@ static void repaint_prism(Display *display)
     if (window == None || window == PointerRoot || !XGetClassHint(display, window, &hint))
         return;
 
-    bool is_prism = hint.res_class && strcmp(hint.res_class, "PrismLauncher") == 0;
+    bool is_pinecone = hint.res_class && strcmp(hint.res_class, "ElyPrismLauncher") == 0;
     XFree(hint.res_name);
     XFree(hint.res_class);
-    if (!is_prism)
+    if (!is_pinecone)
         return;
 
     XWindowAttributes attrs;
@@ -53,7 +53,7 @@ int main(void)
     pid_t launcher = getpid();
     pid_t repaint = fork();
     if (repaint == -1) {
-        perror("start-prism: fork");
+        perror("start-pinecone: fork");
         return EXIT_FAILURE;
     }
 
@@ -63,18 +63,19 @@ int main(void)
 
         Display *display = XOpenDisplay(NULL);
         if (!display) {
-            fputs("start-prism: could not open XWayland for launcher repaints\n", stderr);
+            fputs("start-pinecone: could not open XWayland for launcher repaints\n", stderr);
             return EXIT_FAILURE;
         }
         XSetErrorHandler(ignore_x_error);
 
         for (;;) {
-            repaint_prism(display);
+            repaint_pinecone(display);
             sleep(2);
         }
     }
 
-    execlp("prismlauncher", "prismlauncher", (char *)NULL);
-    perror("start-prism: prismlauncher");
+    const char *app_run = "/opt/pinecone/AppRun";
+    execl(app_run, app_run, "--dir", "/home/player/.local/share/PineconeMC", (char *)NULL);
+    perror("start-pinecone: AppRun");
     return EXIT_FAILURE;
 }

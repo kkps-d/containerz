@@ -9,7 +9,7 @@ mounts=()
 case ${1:-} in
     --minecraft)
         image=containerz/minecraft:dev
-        mounts=(--mount type=volume,src=containerz-minecraft-data,dst=/home/player/.local/share/PrismLauncher)
+        mounts=(--mount type=volume,src=containerz-pinecone-data,dst=/home/player/.local/share/PineconeMC)
         shift
         ;;
     --openarena)
