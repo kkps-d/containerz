@@ -30,8 +30,10 @@ bash scripts/smoke-streamer.sh --holocure amd 0000:0d:00.0
 If the Remote Desktop viewer is already serving port 5173, set
 `HOLOCURE_REUSE_CLIENT=1` when running the launcher. Open
 `http://localhost:5173`, connect to `localhost:8080`, and unmute audio.
-Click into the stream and use WASD to move. Left-click toggles mouse aiming
-during a stage. Press Ctrl+C in the launcher when finished.
+Choose **Input → Mouse → Relative** and click the stream to capture the mouse.
+Use WASD to move. Left-click toggles mouse aiming during a stage. The image
+sets `CONTAINERZ_STREAM_CURSOR=game-drawn` so the stream shows HoloCure's own
+cursor. Press Ctrl+C in the launcher when finished.
 
 The launcher mounts the extracted game at `/opt/holocure` read-only.
 The game runs from a writable copy in `/home/player/.wine-holocure/game`,

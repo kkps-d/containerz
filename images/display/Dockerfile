@@ -4,7 +4,7 @@ FROM containerz/base:dev AS gamescope-builder
 USER root
 WORKDIR /build
 
-# Pin the Ubuntu source this PipeWire loop-locking backport applies to.
+# Pin the Ubuntu source these PipeWire patches apply to.
 ARG GAMESCOPE_SOURCE_VERSION=3.16.20+ds-1
 RUN printf '%s\n' 'deb-src http://archive.ubuntu.com/ubuntu/ resolute multiverse' \
         > /etc/apt/sources.list.d/gamescope-source.list \
@@ -14,10 +14,11 @@ RUN printf '%s\n' 'deb-src http://archive.ubuntu.com/ubuntu/ resolute multiverse
     && apt-get source "gamescope=${GAMESCOPE_SOURCE_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
 
-COPY patches/gamescope-pipewire-loop-locking.patch /build/
+COPY patches/gamescope-pipewire-loop-locking.patch patches/gamescope-pipewire-cursor.patch /build/
 RUN cd gamescope-*/ \
     && patch --batch --fuzz=0 -p1 < ../gamescope-pipewire-loop-locking.patch \
-    && sed -i '1s/) /+containerz1) /' debian/changelog \
+    && patch --batch --fuzz=0 -p1 < ../gamescope-pipewire-cursor.patch \
+    && sed -i '1s/) /+containerz2) /' debian/changelog \
     && DEB_BUILD_OPTIONS=nocheck dpkg-buildpackage -b -uc -us -j8 \
     && install -D -m 0644 ../gamescope_*_amd64.deb /packages/gamescope.deb
 

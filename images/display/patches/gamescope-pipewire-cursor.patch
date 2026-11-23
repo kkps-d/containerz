@@ -1,0 +1,328 @@
+Subject: [PATCH] Include the visible cursor in opt-in PipeWire capture
+
+diff --git a/src/pipewire.cpp b/src/pipewire.cpp
+--- a/src/pipewire.cpp
++++ b/src/pipewire.cpp
+@@ -327,6 +327,7 @@
+ 		state->seq = 0;
+ 		break;
+ 	case PW_STREAM_STATE_STREAMING:
++		state->stream_generation++;
+ 		state->streaming = true;
+ 		break;
+ 	case PW_STREAM_STATE_ERROR:
+@@ -747,6 +748,11 @@
+ 	return state->streaming;
+ }
+ 
++uint64_t pipewire_stream_generation()
++{
++	return pipewire_state.stream_generation;
++}
++
+ struct pipewire_buffer *dequeue_pipewire_buffer(void)
+ {
+ 	struct pipewire_state *state = &pipewire_state;
+diff --git a/src/pipewire.hpp b/src/pipewire.hpp
+--- a/src/pipewire.hpp
++++ b/src/pipewire.hpp
+@@ -16,6 +16,7 @@
+ 	struct pw_stream *stream;
+ 	uint32_t stream_node_id;
+ 	std::atomic<bool> streaming;
++	std::atomic<uint64_t> stream_generation;
+ 	struct spa_video_info_raw video_info;
+ 	struct spa_gamescope gamescope_info;
+ 	uint64_t focus_appid;
+@@ -59,6 +60,7 @@
+ uint32_t get_pipewire_stream_node_id(void);
+ struct pipewire_buffer *dequeue_pipewire_buffer(void);
+ bool pipewire_is_streaming();
++uint64_t pipewire_stream_generation();
+ void pipewire_destroy_buffer(struct pipewire_buffer *buffer);
+ void push_pipewire_buffer(struct pipewire_buffer *buffer);
+ void nudge_pipewire(void);
+diff --git a/src/pipewire_cursor.hpp b/src/pipewire_cursor.hpp
+new file mode 100644
+--- /dev/null
++++ b/src/pipewire_cursor.hpp
+@@ -0,0 +1,99 @@
++#pragma once
++
++#include <cerrno>
++#include <cstring>
++#include <string>
++#include <poll.h>
++#include <sys/socket.h>
++#include <sys/un.h>
++#include <unistd.h>
++
++// One connection owns the PipeWire cursor request for its lifetime.
++class PipeWireCursorControl
++{
++public:
++	PipeWireCursorControl() = default;
++	PipeWireCursorControl(const PipeWireCursorControl &) = delete;
++	PipeWireCursorControl &operator=(const PipeWireCursorControl &) = delete;
++
++	~PipeWireCursorControl()
++	{
++		if (m_client >= 0)
++			close(m_client);
++		if (m_listener >= 0)
++			close(m_listener);
++		if (!m_path.empty())
++			unlink(m_path.c_str());
++	}
++
++	bool Open(const char *path)
++	{
++		sockaddr_un address = {};
++		address.sun_family = AF_UNIX;
++		if (std::strlen(path) >= sizeof(address.sun_path))
++		{
++			errno = ENAMETOOLONG;
++			return false;
++		}
++		std::strcpy(address.sun_path, path);
++
++		int listener = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
++		if (listener < 0)
++			return false;
++
++		const bool bound = bind(listener, reinterpret_cast<const sockaddr *>(&address), sizeof(address)) == 0;
++		if (!bound || listen(listener, 1) < 0)
++		{
++			int error = errno;
++			close(listener);
++			if (bound)
++				unlink(path);
++			errno = error;
++			return false;
++		}
++		m_listener = listener;
++		m_path = path;
++		return true;
++	}
++
++	bool ReadVisible()
++	{
++		if (m_listener < 0)
++			return false;
++		if (m_client < 0)
++			m_client = accept4(m_listener, nullptr, nullptr, SOCK_NONBLOCK | SOCK_CLOEXEC);
++		if (m_client < 0)
++			return false;
++
++		pollfd event = {m_client, POLLIN | POLLRDHUP, 0};
++		if (poll(&event, 1, 0) <= 0)
++			return m_visible;
++		if (event.revents & (POLLRDHUP | POLLHUP | POLLERR | POLLNVAL))
++			return Disconnect();
++
++		char commands[64];
++		ssize_t count = recv(m_client, commands, sizeof(commands), 0);
++		if (count == 0 || (count < 0 && errno != EAGAIN && errno != EINTR))
++			return Disconnect();
++		for (ssize_t index = 0; index < count; index++)
++		{
++			if (commands[index] == '0' || commands[index] == '1')
++				m_visible = commands[index] == '1';
++		}
++		return m_visible;
++	}
++
++private:
++	bool Disconnect()
++	{
++		close(m_client);
++		m_client = -1;
++		m_visible = false;
++		return false;
++	}
++
++	int m_listener = -1;
++	int m_client = -1;
++	bool m_visible = false;
++	std::string m_path;
++};
+diff --git a/src/steamcompmgr.cpp b/src/steamcompmgr.cpp
+--- a/src/steamcompmgr.cpp
++++ b/src/steamcompmgr.cpp
+@@ -109,6 +109,7 @@
+ 
+ #if HAVE_PIPEWIRE
+ #include "pipewire.hpp"
++#include "pipewire_cursor.hpp"
+ #endif
+ 
+ #define STB_IMAGE_IMPLEMENTATION
+@@ -2292,7 +2293,23 @@
+ }
+ 
+ #if HAVE_PIPEWIRE
+-static void paint_pipewire()
++struct PipeWireCursorFrame
++{
++	gamescope::Rc<CVulkanTexture> texture;
++	float x = 0, y = 0, scale = 0;
++	bool operator==(const PipeWireCursorFrame &) const = default;
++};
++
++struct PipeWireFrameState
++{
++	uint64_t generation = 0;
++	uint64_t focusCommit = 0;
++	uint64_t overrideCommit = 0;
++	uint32_t width = 0, height = 0;
++	PipeWireCursorFrame cursor;
++};
++
++static void paint_pipewire(PipeWireFrameState &lastFrame, bool bShowCursor)
+ {
+ 	static struct pipewire_buffer *s_pPipewireBuffer = nullptr;
+ 
+@@ -2326,7 +2343,8 @@
+ 
+ 	const uint64_t ulFocusAppId = s_pPipewireBuffer->gamescope_info.focus_appid;
+ 
+-	focus_t *pFocus = nullptr;
++	global_focus_t *pCurrentFocus = GetCurrentFocus();
++	focus_t *pFocus = pCurrentFocus;
+ 	if ( ulFocusAppId )
+ 	{
+ 		static uint64_t s_ulLastFocusAppId = 0;
+@@ -2348,32 +2366,13 @@
+ 		}
+ 		pFocus = &s_PipewireFocus;
+ 	}
+-	else
+-	{
+-		pFocus = GetCurrentFocus();
+-	}
+-
+-	if ( !pFocus->focusWindow )
++	if ( !pFocus || !pFocus->focusWindow )
+ 		return;
+ 
+ 	const bool bAppIdMatches = !ulFocusAppId || pFocus->focusWindow->appID == ulFocusAppId;
+ 	if ( !bAppIdMatches )
+ 		return;
+ 
+-	// If the commits are the same as they were last time, don't repaint and don't push a new buffer on the stream.
+-	static uint64_t s_ulLastFocusCommitId = 0;
+-	static uint64_t s_ulLastOverrideCommitId = 0;
+-
+-	uint64_t ulFocusCommitId = window_last_done_commit_id( pFocus->focusWindow );
+-	uint64_t ulOverrideCommitId = window_last_done_commit_id( pFocus->overrideWindow );
+-
+-	if ( ulFocusCommitId == s_ulLastFocusCommitId &&
+-	     ulOverrideCommitId == s_ulLastOverrideCommitId )
+-		return;
+-
+-	s_ulLastFocusCommitId = ulFocusCommitId;
+-	s_ulLastOverrideCommitId = ulOverrideCommitId;
+-
+ 	uint32_t uWidth = s_pPipewireBuffer->texture->width();
+ 	uint32_t uHeight = s_pPipewireBuffer->texture->height();
+ 
+@@ -2384,12 +2383,51 @@
+ 	g_uCompositeDebug = 0;
+ 	currentOutputWidth = uWidth;
+ 	currentOutputHeight = uHeight;
++	defer(
++		g_uCompositeDebug = uCompositeDebugBackup;
++		currentOutputWidth = uBackupWidth;
++		currentOutputHeight = uBackupHeight;
++	);
+ 
+ 	// Paint the windows we have onto the Pipewire stream.
+ 	paint_window( pFocus->focusWindow, pFocus->focusWindow, &frameInfo, nullptr, 0, 1.0f, pFocus->overrideWindow );
+-
+-	if ( pFocus->overrideWindow && !pFocus->focusWindow->isSteamStreamingClient )
++	if ( frameInfo.layerCount == 0 )
++		return;
++
++	const bool bPaintOverride = pFocus->overrideWindow && !pFocus->focusWindow->isSteamStreamingClient;
++	if ( bPaintOverride )
+ 		paint_window( pFocus->overrideWindow, pFocus->focusWindow, &frameInfo, nullptr, PaintWindowFlag::NoFilter, 1.0f, pFocus->overrideWindow );
++
++	PipeWireFrameState frame = {
++		.generation = pipewire_stream_generation(),
++		.focusCommit = window_last_done_commit_id( pFocus->focusWindow ),
++		.overrideCommit = window_last_done_commit_id( pFocus->overrideWindow ),
++		.width = uWidth,
++		.height = uHeight,
++	};
++	if ( bShowCursor && !ulFocusAppId && pCurrentFocus->cursor && ShouldDrawCursor() )
++	{
++		steamcompmgr_win_t *input = pFocus->inputFocusWindow;
++		if ( input == pFocus->focusWindow || (bPaintOverride && input == pFocus->overrideWindow) )
++		{
++			MouseCursor *cursor = pCurrentFocus->cursor;
++			cursor->undirty();
++			const int cursorLayer = frameInfo.layerCount;
++			cursor->paint( input, input == pFocus->focusWindow ? pFocus->overrideWindow : nullptr, &frameInfo );
++			if ( frameInfo.layerCount > cursorLayer )
++			{
++				const auto &layer = frameInfo.layers[cursorLayer];
++				frame.cursor = {layer.tex, layer.offset.x, layer.offset.y, layer.scale.x};
++			}
++		}
++	}
++
++	// The cursor can change even when the captured windows have no new commits.
++	if ( frame.generation == lastFrame.generation &&
++	     frame.focusCommit == lastFrame.focusCommit && frame.overrideCommit == lastFrame.overrideCommit &&
++	     frame.width == lastFrame.width && frame.height == lastFrame.height &&
++	     frame.cursor == lastFrame.cursor )
++		return;
+ 
+ 	gamescope::Rc<CVulkanTexture> pRGBTexture = s_pPipewireBuffer->texture->isYcbcr()
+ 		? vulkan_acquire_screenshot_texture( uWidth, uHeight, false, DRM_FORMAT_XRGB2101010 )
+@@ -2402,17 +2440,13 @@
+ 	// If we ever want the fat compositing path, use this.
+ 	//std::optional<uint64_t> oPipewireSequence = vulkan_composite( &frameInfo, s_pPipewireBuffer->texture, false, pRGBTexture, false );
+ 
+-	g_uCompositeDebug = uCompositeDebugBackup;
+-
+-	currentOutputWidth = uBackupWidth;
+-	currentOutputHeight = uBackupHeight;
+-
+ 	if ( oPipewireSequence )
+ 	{
+ 		vulkan_wait( *oPipewireSequence, true );
+ 
+ 		push_pipewire_buffer( s_pPipewireBuffer );
+ 		s_pPipewireBuffer = nullptr;
++		lastFrame = std::move(frame);
+ 	}
+ }
+ #endif
+@@ -8112,6 +8146,15 @@
+ steamcompmgr_main(int argc, char **argv)
+ {
+ 	int	readyPipeFD = -1;
++#if HAVE_PIPEWIRE
++	PipeWireCursorControl pipewireCursor;
++	PipeWireFrameState lastPipeWireFrame;
++	if ( const char *path = getenv("GAMESCOPE_PIPEWIRE_CURSOR_SOCKET"); path && *path )
++	{
++		if ( !pipewireCursor.Open(path) )
++			xwm_log.errorf_errno("Could not open PipeWire cursor socket %s", path);
++	}
++#endif
+ 
+ 	// Reset getopt() state
+ 	optind = 1;
+@@ -8966,8 +9009,9 @@
+ 			GetVBlankTimer().ArmNextVBlank( true );
+ 
+ #if HAVE_PIPEWIRE
++			const bool bShowPipeWireCursor = pipewireCursor.ReadVisible();
+ 			if ( pipewire_is_streaming() )
+-				paint_pipewire();
++				paint_pipewire(lastPipeWireFrame, bShowPipeWireCursor);
+ #endif
+ 		}
+ 

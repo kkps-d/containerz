@@ -26,8 +26,9 @@ bash scripts/smoke-streamer.sh --minecraft amd 0000:0d:00.0
 ```
 
 Open `http://localhost:5173` and connect to `localhost:8080`. Choose **Relative**
-mouse mode and click the stream to capture the pointer. For local single-player
-testing, open **Settings → Accounts → Add Offline** and choose a username.
+mouse mode and click the stream to capture the pointer. Gamescope streams the
+cursor in menus and inventory. For local single-player testing, open
+**Settings → Accounts → Add Offline** and choose a username.
 Create or import an instance and click **Launch** to download its game files.
 
 For a smoke test, create a vanilla **1.21.11** instance and select Java 21 in

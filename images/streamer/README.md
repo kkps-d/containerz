@@ -7,8 +7,9 @@ from the monitor of the container-local `containerz-game-audio` stereo sink.
 
 ## Build
 
-Use a native Linux host with Docker, Node.js 24, and the gamescope input changes
-in the sibling `web-remote-desktop` checkout. Run these from the `containerz` root.
+Use a native Linux host with Docker, Node.js 24, and the gamescope input and
+`pipewire_cursor_socket` changes in the sibling `web-remote-desktop` checkout.
+Run these from the `containerz` root.
 
 ```bash
 docker build -t containerz/base:dev images/base
@@ -44,8 +45,15 @@ bash scripts/smoke-streamer.sh --visual-input-test nvidia 0000:01:00.0
 ```
 
 Use `--input-test` to run `xev` and print the raw X11 events to the terminal.
-The static `xev` window can need a repaint before gamescope sends a new first
-frame after reconnecting.
+In Relative mouse mode, move the pointer over the static window to check that
+cursor changes are streamed. [Idle reconnects](#idle-reconnects)
+
+### Cursor policy
+
+`CONTAINERZ_STREAM_CURSOR=auto` is the default. In Relative mouse mode, the
+viewer requests the gamescope cursor and gamescope includes it while visible.
+Set `CONTAINERZ_STREAM_CURSOR=game-drawn` in images such as HoloCure that draw
+their own cursor. The browser's mouse mode remains a viewer setting.
 
 ### Audio
 
@@ -100,3 +108,11 @@ The [local game coordinator](../../game-coordinator-small/README.md) sets
 `CONTAINERZ_AGENT_PORT`, `DISPLAY_WIDTH`, `DISPLAY_HEIGHT`, and `DISPLAY_FPS`.
 Rebuild the streamer and game images after changing the startup script or the
 agent. Coordinator agent signaling listens on `127.0.0.1`.
+
+### Idle reconnects
+
+Each viewer opens a fresh PipeWire capture. Gamescope sends the latest committed
+window frame when capture starts, even if the window is idle. On cold startup,
+the agent needs the game to draw its first frame before it can negotiate WebRTC
+video. If the viewer reports `No video from the capture pipeline`, wait for the
+game window to open and reconnect.

@@ -23,7 +23,14 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 0' INT TERM
 
-agent_config=/etc/containerz/agent.toml
+cursor_socket=containerz-cursor.sock
+case ${CONTAINERZ_STREAM_CURSOR:-auto} in
+    auto) export GAMESCOPE_PIPEWIRE_CURSOR_SOCKET="$XDG_RUNTIME_DIR/$cursor_socket" ;;
+    game-drawn) unset GAMESCOPE_PIPEWIRE_CURSOR_SOCKET ;;
+    *) log 'CONTAINERZ_STREAM_CURSOR must be auto or game-drawn'; exit 1 ;;
+esac
+
+agent_config=$XDG_RUNTIME_DIR/containerz-agent.toml
 if [[ -n ${CONTAINERZ_AGENT_PORT:-} ]]; then
     for value in "$CONTAINERZ_AGENT_PORT" "$DISPLAY_WIDTH" "$DISPLAY_HEIGHT" "$DISPLAY_FPS"; do
         if [[ ! $value =~ ^[1-9][0-9]*$ ]]; then
@@ -31,15 +38,24 @@ if [[ -n ${CONTAINERZ_AGENT_PORT:-} ]]; then
             exit 1
         fi
     done
-    agent_config=$XDG_RUNTIME_DIR/containerz-agent.toml
     sed -e "s/^port = .*/port = $CONTAINERZ_AGENT_PORT\nloopback_only = true/" \
         -e "s/^width_px = .*/width_px = $DISPLAY_WIDTH/" \
         -e "s/^height_px = .*/height_px = $DISPLAY_HEIGHT/" \
         /etc/containerz/agent.toml > "$agent_config"
-    printf '\n[stream]\ndefault_fps = %s\nmax_fps = %s\n' "$DISPLAY_FPS" "$DISPLAY_FPS" >> "$agent_config"
 else
     # The standalone image uses the native source dimensions in agent.toml.
     export DISPLAY_WIDTH=1280 DISPLAY_HEIGHT=720
+    cp /etc/containerz/agent.toml "$agent_config"
+fi
+if [[ -n ${GAMESCOPE_PIPEWIRE_CURSOR_SOCKET:-} ]]; then
+    # A restarted container can retain the socket from an unclean shutdown.
+    if [[ -S $GAMESCOPE_PIPEWIRE_CURSOR_SOCKET ]]; then
+        rm -f -- "$GAMESCOPE_PIPEWIRE_CURSOR_SOCKET" || log 'could not remove the stale cursor socket'
+    fi
+    printf '\npipewire_cursor_socket = "%s"\n' "$cursor_socket" >> "$agent_config"
+fi
+if [[ -n ${CONTAINERZ_AGENT_PORT:-} ]]; then
+    printf '\n[stream]\ndefault_fps = %s\nmax_fps = %s\n' "$DISPLAY_FPS" "$DISPLAY_FPS" >> "$agent_config"
 fi
 start-display "$@" &
 display_pid=$!

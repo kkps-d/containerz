@@ -16,9 +16,9 @@ docker build -t containerz/base:dev images/base
 docker build -t containerz/display:dev images/display
 ```
 
-The builder stage backports the PipeWire loop fix to Ubuntu's gamescope package
-so capture clients receive frames. Once Ubuntu ships the fix, remove the builder
-stage and install gamescope from apt again. [Gamescope 3.16.22 release](https://github.com/ValveSoftware/gamescope/releases/tag/3.16.22)
+The builder stage patches Ubuntu's gamescope package with the PipeWire loop
+fix and optional cursor capture. The streamer image enables cursor control
+when the game's policy allows it. [Streamer cursor policy](../streamer/README.md#cursor-policy)
 
 ## Run on NVIDIA
 

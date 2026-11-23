@@ -8,7 +8,8 @@ RUN apt-get update \
 
 ENV WINEPREFIX=/home/player/.wine-holocure \
     WINEDLLOVERRIDES="mscoree,mshtml=" \
-    WINEDEBUG=fixme-all
+    WINEDEBUG=fixme-all \
+    CONTAINERZ_STREAM_CURSOR=game-drawn
 
 COPY --chmod=0755 start-holocure.sh /usr/local/bin/start-holocure
 CMD ["start-holocure"]
