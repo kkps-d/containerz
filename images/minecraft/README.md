@@ -31,6 +31,11 @@ cursor in menus and inventory. For local single-player testing, open
 **Settings → Accounts → Add Offline** and choose a username.
 Create or import an instance and click **Launch** to download its game files.
 
+Each Minecraft launch sets **Max Framerate** to the requested `DISPLAY_FPS`
+and turns **VSync** on. The coordinator passes the FPS selected on the game
+card. Standalone launches use 60 fps by default. These two settings are applied
+again when you relaunch an instance from PineconeMC.
+
 For a smoke test, create a vanilla **1.21.11** instance and select Java 21 in
 the instance settings. The image also includes Java 25 for releases that
 require it. Unmute audio in the viewer when you enter a world.

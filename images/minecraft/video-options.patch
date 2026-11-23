@@ -1,0 +1,10 @@
+--- EntryPoint.java
++++ EntryPoint.java
+@@ -126,6 +126,7 @@
+                     throw new IllegalArgumentException("Invalid launcher type: " + launcherType);
+             }
+ 
++            VideoOptions.apply();
+             launcher.launch();
+ 
+             return ExitCode.NORMAL;

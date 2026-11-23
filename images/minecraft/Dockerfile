@@ -18,6 +18,21 @@ RUN curl --proto '=https' --tlsv1.2 -fsSL --retry 3 \
 COPY start-pinecone.c /build/start-pinecone.c
 RUN cc -O2 -Wall -Wextra -Werror start-pinecone.c -lX11 -o start-pinecone
 
+RUN apt-get update && apt-get install -y --no-install-recommends openjdk-21-jdk-headless patch \
+    && rm -rf /var/lib/apt/lists/*
+
+# Patch the game entry point so instance-specific launch commands still run normally.
+ARG PINECONE_ENTRYPOINT_SHA256=b3fef437ba982f14b73b584e51463c8f6856a3077d576dcfd6bc7f9c9149c0da
+COPY VideoOptions.java video-options.patch /build/
+RUN curl --proto '=https' --tlsv1.2 -fsSL --retry 3 \
+        "https://raw.githubusercontent.com/ElyPrismLauncher/Launcher/${PINECONE_VERSION}/libraries/launcher/org/prismlauncher/EntryPoint.java" \
+        -o EntryPoint.java \
+    && printf '%s  EntryPoint.java\n' "$PINECONE_ENTRYPOINT_SHA256" | sha256sum -c - \
+    && patch --fuzz=0 EntryPoint.java < video-options.patch \
+    && launcher_jar=squashfs-root/share/ElyPrismLauncher/NewLaunch.jar \
+    && javac --release 8 -Xlint:all,-options -Werror -cp "$launcher_jar" -d classes EntryPoint.java VideoOptions.java \
+    && jar uf "$launcher_jar" -C classes org/prismlauncher
+
 FROM containerz/streamer:dev
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
