@@ -3,8 +3,13 @@ set -euo pipefail
 
 fail() { echo "smoke-streamer: $*" >&2; exit 1; }
 
+image=containerz/streamer:dev
 command=()
 case ${1:-} in
+    --openarena)
+        image=containerz/openarena:dev
+        shift
+        ;;
     --input-test)
         command=(start-streamer stdbuf -oL xev -geometry 1152x648+0+0 -event keyboard -event mouse)
         shift
@@ -24,7 +29,7 @@ case ${1:-} in
 esac
 
 if (( $# < 2 || $# > 3 )); then
-    fail 'usage: bash scripts/smoke-streamer.sh [--audio-test|--input-test|--piano-test|--visual-input-test] nvidia|amd PCI_ADDRESS [WEB_REMOTE_DESKTOP_DIR]'
+    fail 'usage: bash scripts/smoke-streamer.sh [--openarena|--audio-test|--input-test|--piano-test|--visual-input-test] nvidia|amd PCI_ADDRESS [WEB_REMOTE_DESKTOP_DIR]'
 fi
 
 gpu=$1
@@ -72,7 +77,7 @@ trap 'exit 0' INT TERM
 
 container=$(docker run -d --pull never --network host --stop-timeout 15 --ulimit core=0 \
     "${devices[@]}" --group-add "$(stat -c %g "$card")" --group-add "$(stat -c %g "$render")" \
-    containerz/streamer:dev "${command[@]}")
+    "$image" "${command[@]}")
 docker logs --follow "$container" &
 logs_pid=$!
 setsid npm --prefix "$client_dir" run dev -- --port 5173 --strictPort &

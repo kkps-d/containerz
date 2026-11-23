@@ -85,6 +85,8 @@ cc -O2 images/streamer/piano-tester.c $(pkg-config --cflags --libs sdl3) -lm -o 
 Hold two notes with two fingers, then lift one. The other key should stay lit
 and keep sounding while the contact count drops from two to one.
 
+### LAN testing
+
 For a second device on the LAN, use the Linux host's LAN address for both
 ports. The launcher uses host networking so browsers can reach the agent's
 WebRTC UDP ports directly, which avoids Docker bridge NAT. Run this smoke test
