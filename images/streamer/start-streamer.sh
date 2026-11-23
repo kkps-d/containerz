@@ -23,8 +23,25 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 0' INT TERM
 
-# These dimensions match the native source declared in agent.toml.
-DISPLAY_WIDTH=1280 DISPLAY_HEIGHT=720 start-display "$@" &
+agent_config=/etc/containerz/agent.toml
+if [[ -n ${CONTAINERZ_AGENT_PORT:-} ]]; then
+    for value in "$CONTAINERZ_AGENT_PORT" "$DISPLAY_WIDTH" "$DISPLAY_HEIGHT" "$DISPLAY_FPS"; do
+        if [[ ! $value =~ ^[1-9][0-9]*$ ]]; then
+            log 'Agent port, display dimensions, and frame rate must be positive integers'
+            exit 1
+        fi
+    done
+    agent_config=$XDG_RUNTIME_DIR/containerz-agent.toml
+    sed -e "s/^port = .*/port = $CONTAINERZ_AGENT_PORT\nloopback_only = true/" \
+        -e "s/^width_px = .*/width_px = $DISPLAY_WIDTH/" \
+        -e "s/^height_px = .*/height_px = $DISPLAY_HEIGHT/" \
+        /etc/containerz/agent.toml > "$agent_config"
+    printf '\n[stream]\ndefault_fps = %s\nmax_fps = %s\n' "$DISPLAY_FPS" "$DISPLAY_FPS" >> "$agent_config"
+else
+    # The standalone image uses the native source dimensions in agent.toml.
+    export DISPLAY_WIDTH=1280 DISPLAY_HEIGHT=720
+fi
+start-display "$@" &
 display_pid=$!
 
 has_video_node() {
@@ -50,7 +67,7 @@ until has_video_node; do
     sleep 0.1
 done
 
-agent --config /etc/containerz/agent.toml &
+agent --config "$agent_config" &
 agent_pid=$!
 
 while kill -0 "$display_pid" 2>/dev/null && kill -0 "$agent_pid" 2>/dev/null; do

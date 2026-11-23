@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Game coordinator</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: system-ui, sans-serif;
+      background: light-dark(#eff3f5, #172126);
+      color: light-dark(#172126, #edf4f5);
+      --surface: light-dark(#fff, #202e34);
+      --muted: light-dark(#4a5e66, #b3c5ca);
+      --border: light-dark(#c3d0d5, #475d64);
+      --accent: light-dark(#245f58, #9cddd0);
+      --on-accent: light-dark(#fff, #133b36);
+      --error: light-dark(#992e29, #ffb4aa);
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 56rem; margin: clamp(1.75rem, 7vw, 5rem) auto; padding: 0 1rem; }
+    h1 { margin: 0 0 1.25rem; font-size: clamp(1.55rem, 4vw, 2rem); }
+    h2 { margin: 0 0 .4rem; font-size: 1.35rem; }
+    p { margin: .55rem 0 0; }
+
+    .profiles, article {
+      padding: clamp(1rem, 4vw, 1.5rem);
+      border: 1px solid var(--border);
+      border-radius: .75rem;
+      background: var(--surface);
+    }
+
+    .profiles, .games, .display-settings {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: .85rem 1rem;
+    }
+
+    .games { margin-top: 1rem; }
+    .profiles form, .actions {
+      display: flex;
+      align-items: end;
+      flex-wrap: wrap;
+      gap: .65rem;
+    }
+
+    .profiles form label { flex: 1 1 9rem; }
+    label { display: grid; gap: .3rem; min-width: 0; }
+    label span { font-size: .9rem; font-weight: 600; }
+    input, select, button, a {
+      min-height: 2.65rem;
+      padding: .55rem .7rem;
+      border: 1px solid var(--border);
+      border-radius: .4rem;
+      font: inherit;
+      color: inherit;
+      background: var(--surface);
+    }
+
+    input, select { width: 100%; }
+    button, a { font-weight: 600; }
+    button:enabled, a { cursor: pointer; }
+    button:disabled, select:disabled { opacity: .6; }
+    .play:enabled { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .muted, .status { color: var(--muted); }
+    .error { color: var(--error); overflow-wrap: anywhere; }
+    .settings { display: grid; gap: .75rem; margin: 1.1rem 0; }
+    .viewer { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; margin-top: 1rem; }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 38rem) {
+      .profiles, .games { grid-template-columns: minmax(0, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Game coordinator</h1>
+    <div class="profiles">
+      <label>
+        <span>Profile</span>
+        <select id="profile" disabled><option value="">Loading profiles…</option></select>
+      </label>
+      <form id="create-profile">
+        <label>
+          <span>New profile name</span>
+          <input id="profile-name" name="name" maxlength="48" required>
+        </label>
+        <button type="submit">Create Profile</button>
+      </form>
+    </div>
+    <p class="muted" id="empty" hidden>Create a profile to start playing.</p>
+    <p class="error" id="page-error" role="alert" hidden></p>
+    <div class="games" id="games" aria-label="Games"></div>
+  </main>
+  <template id="game-card">
+    <article>
+      <h2></h2>
+      <p class="status" role="status">Checking game status…</p>
+      <p class="error" role="alert" hidden></p>
+      <form>
+        <div class="settings">
+          <label><span>GPU</span><select name="gpu" required></select></label>
+          <div class="display-settings">
+            <label><span>Resolution</span><select name="resolution"></select></label>
+            <label><span>Frame rate</span><select name="fps"></select></label>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="submit" class="play" disabled>Play</button>
+          <button type="button" class="stop" disabled>Stop Game</button>
+        </div>
+      </form>
+      <div class="viewer" hidden>
+        <a target="_blank" rel="noopener">Open Viewer</a>
+        <code class="muted"></code>
+      </div>
+      <p class="muted save-tip" hidden>Save and quit your world before stopping Minecraft.</p>
+    </article>
+  </template>
+  <script type="module">
+    const profilePicker = document.querySelector('#profile');
+    const profileForm = document.querySelector('#create-profile');
+    const profileName = document.querySelector('#profile-name');
+    const createButton = profileForm.querySelector('button');
+    const pageError = document.querySelector('#page-error');
+    const empty = document.querySelector('#empty');
+    const gamesPanel = document.querySelector('#games');
+    const template = document.querySelector('#game-card');
+    const profileStorageKey = 'containerz-profile';
+    let activeProfile = '';
+    let gpus = [];
+    let cards = new Map();
+    let statusRequest = 0;
+    let refreshing = false;
+
+    async function request(path, method = 'GET', data) {
+      const init = data === undefined
+        ? { method }
+        : { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) };
+      const response = await fetch(path, init);
+      if (response.status === 204) return;
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message);
+      return result;
+    }
+
+    function showMessage(element, message) {
+      if (element.textContent !== message) element.textContent = message;
+      element.hidden = !message;
+    }
+
+    async function loadProfiles(preferred) {
+      const { profiles } = await request('/api/profiles');
+      profilePicker.replaceChildren(...profiles.map(({ id, name }) => new Option(name, id)));
+      if (!profiles.length) profilePicker.add(new Option('No profiles', ''));
+      profilePicker.disabled = profiles.length === 0;
+      empty.hidden = profiles.length > 0;
+      const selected = profiles.some(({ id }) => id === preferred) ? preferred : profiles[0]?.id || '';
+      profilePicker.value = selected;
+      await selectProfile(selected);
+    }
+
+    async function selectProfile(id) {
+      activeProfile = id;
+      cards = new Map();
+      gamesPanel.replaceChildren();
+      showMessage(pageError, '');
+      try { localStorage.setItem(profileStorageKey, id); } catch {}
+      if (id) await refreshGames();
+    }
+
+    function makeCard(game, resolutions, frameRates) {
+      const root = template.content.firstElementChild.cloneNode(true);
+      const title = root.querySelector('h2');
+      title.id = `game-${game.id}`;
+      title.textContent = game.title;
+      root.setAttribute('aria-labelledby', title.id);
+      const form = root.querySelector('form');
+      const card = {
+        pending: '', actionError: '', dirty: false,
+        gpu: form.elements.namedItem('gpu'),
+        resolution: form.elements.namedItem('resolution'),
+        fps: form.elements.namedItem('fps'),
+        status: root.querySelector('.status'),
+        error: root.querySelector('.error'),
+        play: root.querySelector('.play'),
+        stop: root.querySelector('.stop'),
+        viewer: root.querySelector('.viewer'),
+        saveTip: root.querySelector('.save-tip'),
+      };
+
+      for (const { pci, vendor } of gpus) {
+        card.gpu.add(new Option(`${vendor === 'nvidia' ? 'NVIDIA' : 'AMD'} · ${pci}`, pci));
+      }
+      for (const [value, [width, height]] of Object.entries(resolutions)) {
+        card.resolution.add(new Option(`${width} × ${height}`, value));
+      }
+      for (const fps of frameRates) card.fps.add(new Option(`${fps} fps`, fps));
+
+      const profile = activeProfile;
+      form.addEventListener('change', () => { card.dirty = true; });
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        changeGame(profile, game.id, card, 'start', {
+          gpu: card.gpu.value,
+          resolution: card.resolution.value,
+          fps: Number(card.fps.value),
+        });
+      });
+      card.stop.addEventListener('click', () => changeGame(profile, game.id, card, 'stop'));
+      cards.set(game.id, card);
+      gamesPanel.append(root);
+      return card;
+    }
+
+    function renderGame(card) {
+      const { game } = card;
+      if (!card.dirty && !card.pending) {
+        const saved = game.settings;
+        const gpu = saved.gpu ?? gpus[0]?.pci ?? '';
+        if (gpu && !Array.from(card.gpu.options).some((option) => option.value === gpu)) {
+          const unavailable = new Option(`${gpu} · unavailable`, gpu);
+          unavailable.disabled = true;
+          card.gpu.add(unavailable);
+        }
+        card.gpu.value = gpu;
+        card.resolution.value = saved.resolution;
+        card.fps.value = saved.fps;
+      }
+
+      const statuses = {
+        idle: gpus.length ? 'Ready to launch.' : 'No supported GPU detected.',
+        starting: 'Waiting for the streaming agent…',
+        ready: 'Ready to connect.',
+        failed: 'Startup failed.',
+        blocked: 'Game unavailable.',
+      };
+      const message = card.pending || statuses[game.state];
+      if (card.status.textContent !== message) card.status.textContent = message;
+      showMessage(card.error, card.actionError || game.message || '');
+      const editable = !card.pending && game.state === 'idle';
+      card.gpu.disabled = !editable || !gpus.length;
+      card.resolution.disabled = !editable;
+      card.fps.disabled = !editable;
+      card.play.disabled = !editable || !gpus.length;
+      card.stop.disabled = Boolean(card.pending) || !['starting', 'ready', 'failed'].includes(game.state);
+      card.viewer.hidden = Boolean(card.pending) || game.state !== 'ready';
+      card.saveTip.hidden = game.id !== 'minecraft' || game.state !== 'ready';
+      if (game.viewerUrl) {
+        card.viewer.querySelector('a').href = game.viewerUrl;
+        card.viewer.querySelector('code').textContent = game.address;
+      }
+    }
+
+    async function refreshGames() {
+      const profile = activeProfile;
+      if (!profile) return;
+      const requestId = ++statusRequest;
+      refreshing = true;
+      try {
+        const { games, resolutions, frameRates } = await request(`/api/profiles/${profile}/games`);
+        if (profile !== activeProfile || requestId !== statusRequest) return;
+        showMessage(pageError, '');
+        for (const game of games) {
+          const card = cards.get(game.id) ?? makeCard(game, resolutions, frameRates);
+          card.game = game;
+          renderGame(card);
+        }
+      } catch (error) {
+        if (profile === activeProfile && requestId === statusRequest) showMessage(pageError, error.message);
+      } finally {
+        if (requestId === statusRequest) refreshing = false;
+      }
+    }
+
+    async function changeGame(profile, game, card, action, data) {
+      if (card.pending) return;
+      card.pending = action === 'start' ? 'Launching game…' : 'Stopping game…';
+      card.actionError = '';
+      renderGame(card);
+      try {
+        await request(`/api/profiles/${profile}/games/${game}/${action}`, 'POST', data);
+        card.dirty = false;
+      } catch (error) {
+        card.actionError = error.message;
+      } finally {
+        if (activeProfile === profile) await refreshGames();
+        card.pending = '';
+        renderGame(card);
+      }
+    }
+
+    profilePicker.addEventListener('change', () => selectProfile(profilePicker.value));
+    profileForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      createButton.disabled = true;
+      showMessage(pageError, '');
+      try {
+        const { id } = await request('/api/profiles', 'POST', { name: profileName.value });
+        profileForm.reset();
+        await loadProfiles(id);
+      } catch (error) {
+        showMessage(pageError, error.message);
+      } finally {
+        createButton.disabled = false;
+      }
+    });
+
+    try {
+      ({ gpus } = await request('/api/gpus'));
+      let preferred;
+      try { preferred = localStorage.getItem(profileStorageKey); } catch {}
+      await loadProfiles(preferred);
+    } catch (error) {
+      showMessage(pageError, error.message);
+    }
+    setInterval(() => {
+      if (!refreshing) refreshGames();
+    }, 1_000);
+  </script>
+</body>
+</html>

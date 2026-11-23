@@ -30,3 +30,6 @@ Escape to release the browser's mouse lock.
 
 For a LAN test, use the Linux host's LAN address for both ports. Press Ctrl+C
 in the launcher to stop the game and browser client. [LAN setup](../streamer/README.md#lan-testing)
+
+The [local game coordinator](../../game-coordinator-small/README.md) mounts a
+profile's OpenArena volume at `/home/player/.openarena` to keep game settings.

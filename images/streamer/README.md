@@ -93,3 +93,10 @@ WebRTC UDP ports directly, which avoids Docker bridge NAT. Run this smoke test
 on a trusted LAN because signaling uses unauthenticated HTTP. Allow TCP ports
 5173 and 8080 and WebRTC UDP traffic from the test device if the host firewall
 filters them.
+
+### Coordinator launches
+
+The [local game coordinator](../../game-coordinator-small/README.md) sets
+`CONTAINERZ_AGENT_PORT`, `DISPLAY_WIDTH`, `DISPLAY_HEIGHT`, and `DISPLAY_FPS`.
+Rebuild the streamer and game images after changing the startup script or the
+agent. Coordinator agent signaling listens on `127.0.0.1`.
