@@ -62,6 +62,31 @@ fi
 if [[ -n ${CONTAINERZ_AGENT_PORT:-} ]]; then
     printf '\n[stream]\ndefault_fps = %s\nmax_fps = %s\n' "$DISPLAY_FPS" "$DISPLAY_FPS" >> "$agent_config"
 fi
+game_exit_file=
+if [[ ${CONTAINERZ_TRACK_GAME_EXIT:-0} == 1 ]]; then
+    game_exit_file=$XDG_RUNTIME_DIR/containerz-game-exit
+    rm -f -- "$game_exit_file"
+    # Gamescope may fail while shutting down even after the game exited normally.
+    set -- bash -c '
+        exit_file=$1
+        shift
+        status=0
+        "$@" || status=$?
+        printf "%s\n" "$status" > "$exit_file.tmp"
+        mv -- "$exit_file.tmp" "$exit_file"
+        exit "$status"
+    ' containerz-game "$game_exit_file" "$@"
+fi
+
+exit_with_game_status() {
+    local status
+    if [[ -n "$game_exit_file" && -f "$game_exit_file" ]] &&
+       IFS= read -r status < "$game_exit_file"; then
+        log "game exited with status $status"
+        exit "$status"
+    fi
+}
+
 start-display "$@" &
 display_pid=$!
 
@@ -78,6 +103,7 @@ has_video_node() {
 deadline=$((SECONDS + 10))
 until has_video_node; do
     if ! kill -0 "$display_pid" 2>/dev/null; then
+        exit_with_game_status
         log 'gamescope stopped before publishing its video node'
         exit 1
     fi
@@ -92,7 +118,9 @@ agent --config "$agent_config" &
 agent_pid=$!
 
 while kill -0 "$display_pid" 2>/dev/null && kill -0 "$agent_pid" 2>/dev/null; do
+    exit_with_game_status
     sleep 0.2
 done
+exit_with_game_status
 log 'a required process stopped'
 exit 1

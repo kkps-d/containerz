@@ -33,3 +33,6 @@ in the launcher to stop the game and browser client. [LAN setup](../streamer/REA
 
 The [local game coordinator](../../game-coordinator-small/README.md) mounts a
 profile's OpenArena volume at `/home/player/.openarena` to keep game settings.
+
+Quitting OpenArena ends the stream with a successful container exit. The
+streamer preserves the game’s exit status when Gamescope shuts down.

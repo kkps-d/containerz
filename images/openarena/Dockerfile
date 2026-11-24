@@ -4,6 +4,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends openarena libpu
     && rm -rf /var/lib/apt/lists/* \
     && install -d -m 0700 -o player -g player /home/player/.openarena
 
+ENV CONTAINERZ_TRACK_GAME_EXIT=1
+
 # SDL's warp mode keeps relative aiming moving across XWayland cursor boundaries.
 CMD ["start-streamer", "env", "SDL_VIDEODRIVER=x11", "SDL_AUDIODRIVER=pulseaudio", "SDL_MOUSE_RELATIVE_MODE_WARP=1", \
      "/usr/games/openarena", "+set", "fs_homepath", "/home/player/.openarena", "+set", "s_useOpenAL", "0", \
