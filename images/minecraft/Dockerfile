@@ -39,7 +39,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY prepare-seed.py /build/prepare-seed.py
-RUN python3 /build/prepare-seed.py /seed
+ARG MINECRAFT_VERSION=26.3
+RUN python3 /build/prepare-seed.py /seed "$MINECRAFT_VERSION"
 
 FROM containerz/streamer:dev
 

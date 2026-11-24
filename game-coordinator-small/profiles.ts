@@ -4,8 +4,13 @@ import { join } from 'node:path';
 
 export const games = {
   minecraft: {
-    title: 'Minecraft',
-    image: 'containerz/minecraft:dev',
+    title: 'Minecraft 26.3',
+    image: 'containerz/minecraft:26.3',
+    dataPath: '/home/player/.local/share/PineconeMC',
+  },
+  'minecraft-1-21-11': {
+    title: 'Minecraft 1.21.11',
+    image: 'containerz/minecraft:1.21.11',
     dataPath: '/home/player/.local/share/PineconeMC',
   },
   openarena: {

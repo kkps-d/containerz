@@ -378,7 +378,7 @@ export function createCoordinatorServer(dataDir = fileURLToPath(new URL('./data/
         const [width, height] = resolutions[settings.resolution];
         const name = containerName(profile, game);
         const { image, dataPath } = games[game];
-        const gameEnv = game === 'minecraft' ? ['--env', `MINECRAFT_OFFLINE_NAME=${minecraftOfflineName(profile)}`] : [];
+        const gameEnv = game.startsWith('minecraft') ? ['--env', `MINECRAFT_OFFLINE_NAME=${minecraftOfflineName(profile)}`] : [];
         await command('docker', [
           'run', '-d', '--name', name, '--label', `${ownerLabel}=${owner}`,
           '--label', `${profileLabel}=${id}`, '--label', `${gameLabel}=${game}`,

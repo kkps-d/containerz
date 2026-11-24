@@ -15,7 +15,6 @@ import uuid
 from pathlib import Path
 
 
-INSTANCE = "containerz-vanilla-26.3"
 IDENTITY = ".containerz-offline-name"
 LAUNCHER_CONFIG = "elyprismlauncher.cfg"
 USERNAME = re.compile(r"[A-Za-z0-9_]{3,16}")
@@ -141,7 +140,7 @@ def offline_account(path, name):
     return profile_id
 
 
-def provision(seed, data, requested_name):
+def provision(seed, data, requested_name, instance_id):
     if not USERNAME.fullmatch(requested_name):
         raise ValueError("MINECRAFT_OFFLINE_NAME must be 3–16 letters, digits, or underscores")
     data.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -151,7 +150,7 @@ def provision(seed, data, requested_name):
         existing_config = read_text(config)
         settings = {key: value for key, (_, value) in general_settings(existing_config.splitlines()).items()}
         instances = data / settings.get("InstanceDir", "instances").strip('"')
-        instance = instances / INSTANCE
+        instance = instances / instance_id
         managed = instance.exists() or instance.is_symlink()
         if managed and (instance.is_symlink() or not (instance / IDENTITY).is_file()):
             raise ValueError(f"Reserved instance path {instance} is already occupied")
@@ -179,8 +178,8 @@ def provision(seed, data, requested_name):
 
         staging = instances / ".tmp"
         staging.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(dir=staging, prefix=f"{INSTANCE}-") as temporary:
-            staged = Path(temporary) / INSTANCE
+        with tempfile.TemporaryDirectory(dir=staging, prefix=f"{instance_id}-") as temporary:
+            staged = Path(temporary) / instance_id
             shutil.copytree(seed / "instance", staged)
             instance_config = staged / "instance.cfg"
             instance_config.write_text(update_settings(instance_config, {}, {"InstanceAccountId": profile_id}))
@@ -192,12 +191,16 @@ def provision(seed, data, requested_name):
 def main():
     try:
         data = Path.home() / ".local/share/PineconeMC"
-        name = provision(Path("/opt/minecraft-seed"), data, os.environ.get("MINECRAFT_OFFLINE_NAME") or "Player")
-    except (OSError, ValueError, KeyError, TypeError) as error:
+        seed = Path("/opt/minecraft-seed")
+        pack = json.loads((seed / "instance" / "mmc-pack.json").read_text())
+        release = next(component["version"] for component in pack["components"] if component["uid"] == "net.minecraft")
+        instance_id = f"containerz-vanilla-{release}"
+        name = provision(seed, data, os.environ.get("MINECRAFT_OFFLINE_NAME") or "Player", instance_id)
+    except (OSError, ValueError, KeyError, TypeError, StopIteration) as error:
         sys.exit(f"start-minecraft: {error}")
     os.execvp("start-streamer", [
         "start-streamer", "env", "QT_QPA_PLATFORM=xcb", "start-pinecone",
-        "--launch", INSTANCE, "--offline", name,
+        "--launch", instance_id, "--offline", name,
     ])
 
 

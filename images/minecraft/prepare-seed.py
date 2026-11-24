@@ -13,10 +13,20 @@ from urllib.request import urlopen
 META_URL = "https://meta.pineconemc.ru/v1"
 MINECRAFT = "net.minecraft"
 LWJGL = "org.lwjgl3"
-# Keep the launcher metadata stable even if the upstream indexes are updated.
-COMPONENTS = {
-    MINECRAFT: ("26.3", "eace936a849ae84c63f51ae12231b32715b4ee3cd8debf1ac06b0aab29f598bd"),
-    LWJGL: ("3.4.3", "a7fb39cc0aaaf7c545667f570f3baaaf103e51974da45cf74dc92c112c083406"),
+# Pin the launcher metadata and the Java runtime for each supported release.
+RELEASES = {
+    "26.3": (
+        25,
+        "eace936a849ae84c63f51ae12231b32715b4ee3cd8debf1ac06b0aab29f598bd",
+        "3.4.3",
+        "a7fb39cc0aaaf7c545667f570f3baaaf103e51974da45cf74dc92c112c083406",
+    ),
+    "1.21.11": (
+        21,
+        "4f34d0fef0cec65715289497d2574a9ab68de56d1bf83b7d5178057e0c780df9",
+        "3.3.3",
+        "49fe3b3cdec463674d5ec0e2ee607fa6e15dd3a97b5dc2b9ddf9d643ef906f54",
+    ),
 }
 
 
@@ -64,10 +74,12 @@ def library_path(library):
     return Path("libraries", group.replace(".", "/"), artifact, version, filename)
 
 
-def prepare(root):
+def prepare(root, release):
+    java_major, game_hash, lwjgl_version, lwjgl_hash = RELEASES[release]
+    pins = {MINECRAFT: (release, game_hash), LWJGL: (lwjgl_version, lwjgl_hash)}
     packages = {entry["uid"]: entry for entry in metadata(root, "index")["packages"]}
     components = {}
-    for uid, (version, sha256) in COMPONENTS.items():
+    for uid, (version, sha256) in pins.items():
         index = metadata(root, f"{uid}/index", packages[uid]["sha256"])
         entry = next(entry for entry in index["versions"] if entry["version"] == version)
         if entry["sha256"] != sha256:
@@ -75,7 +87,7 @@ def prepare(root):
         components[uid] = metadata(root, f"{uid}/{version}", sha256)
 
     game = components[MINECRAFT]
-    if game["type"] != "release" or game["requires"] != [{"uid": LWJGL, "suggests": COMPONENTS[LWJGL][0]}]:
+    if game["type"] != "release" or game["requires"] != [{"uid": LWJGL, "suggests": lwjgl_version}]:
         raise ValueError("Unexpected dependencies for the pinned Minecraft release")
 
     assets = game["assetIndex"]
@@ -113,7 +125,7 @@ def prepare(root):
     instance = root / "instance"
     (instance / ".minecraft").mkdir(parents=True)
     (instance / ".minecraft" / "options.txt").write_text("lang:en_us\n")
-    java = "/usr/lib/jvm/java-25-openjdk-amd64/bin/java"
+    java = f"/usr/lib/jvm/java-{java_major}-openjdk-amd64/bin/java"
     (instance / "instance.cfg").write_text(
         "[General]\n"
         "ConfigVersion=1.3\n"
@@ -152,4 +164,4 @@ def prepare(root):
 
 
 if __name__ == "__main__":
-    prepare(Path(sys.argv[1]))
+    prepare(Path(sys.argv[1]), sys.argv[2])

@@ -8,6 +8,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -24,11 +25,11 @@ final class VideoOptions {
             throw new IOException("DISPLAY_FPS must be positive");
         }
         apply(Paths.get(gameDir, "options.txt"), fps);
-        System.out.println("Containerz: Minecraft maxFps=" + fps + ", VSync enabled");
+        System.out.println("Containerz: Minecraft maxFps=" + fps + ", VSync and fullscreen enabled");
     }
 
     private static boolean isVideoOption(String line) {
-        return line.startsWith("maxFps:") || line.startsWith("enableVsync:");
+        return line.startsWith("maxFps:") || line.startsWith("enableVsync:") || line.startsWith("fullscreen:");
     }
 
     private static void apply(Path options, int fps) throws IOException {
@@ -45,17 +46,15 @@ final class VideoOptions {
             existing = Collections.emptyList();
         }
 
-        String cap = "maxFps:" + fps;
-        String vsync = "enableVsync:true";
-        if (existing.stream().filter(VideoOptions::isVideoOption).count() == 2
-                && existing.contains(cap) && existing.contains(vsync)) {
+        List<String> overrides = Arrays.asList("maxFps:" + fps, "enableVsync:true", "fullscreen:true");
+        if (existing.stream().filter(VideoOptions::isVideoOption).count() == overrides.size()
+                && existing.containsAll(overrides)) {
             return;
         }
 
         List<String> updated = new ArrayList<>(existing);
         updated.removeIf(VideoOptions::isVideoOption);
-        updated.add(cap);
-        updated.add(vsync);
+        updated.addAll(overrides);
 
         Path temporary = Files.createTempFile(options.getParent(), ".options-", ".txt");
         try {

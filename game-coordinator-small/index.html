@@ -286,7 +286,7 @@
       card.play.disabled = !editable || !gpus.length;
       card.stop.disabled = Boolean(card.pending) || !['starting', 'ready', 'failed'].includes(game.state);
       card.viewer.hidden = Boolean(card.pending) || game.state !== 'ready';
-      card.saveTip.hidden = game.id !== 'minecraft' || game.state !== 'ready';
+      card.saveTip.hidden = !game.id.startsWith('minecraft') || game.state !== 'ready';
       if (game.viewerUrl) {
         card.viewer.querySelector('a').href = game.viewerUrl;
         card.viewer.querySelector('code').textContent = game.address;

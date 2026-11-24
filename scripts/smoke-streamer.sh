@@ -9,9 +9,15 @@ mounts=()
 env_args=()
 reuse_client=0
 case ${1:-} in
-    --minecraft)
-        image=containerz/minecraft:dev
-        mounts=(--mount type=volume,src=containerz-pinecone-data,dst=/home/player/.local/share/PineconeMC)
+    --minecraft|--minecraft-26.3|--minecraft-1.21.11)
+        version=26.3
+        volume=containerz-pinecone-data
+        if [[ $1 == --minecraft-1.21.11 ]]; then
+            version=1.21.11
+            volume=containerz-pinecone-data-1.21.11
+        fi
+        image=containerz/minecraft:$version
+        mounts=(--mount "type=volume,src=$volume,dst=/home/player/.local/share/PineconeMC")
         env_args=(--env MINECRAFT_OFFLINE_NAME)
         shift
         ;;
@@ -43,7 +49,7 @@ case ${1:-} in
 esac
 
 if (( $# < 2 || $# > 3 )); then
-    fail 'usage: bash scripts/smoke-streamer.sh [--minecraft|--openarena|--holocure|--audio-test|--input-test|--piano-test|--visual-input-test] nvidia|amd PCI_ADDRESS [WEB_REMOTE_DESKTOP_DIR]'
+    fail 'usage: bash scripts/smoke-streamer.sh [--minecraft|--minecraft-26.3|--minecraft-1.21.11|--openarena|--holocure|--audio-test|--input-test|--piano-test|--visual-input-test] nvidia|amd PCI_ADDRESS [WEB_REMOTE_DESKTOP_DIR]'
 fi
 
 gpu=$1
