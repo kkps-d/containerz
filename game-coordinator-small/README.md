@@ -46,9 +46,14 @@ and saves live in the game’s Docker volume. Stop a game before changing its
 launch settings. The viewer and agent signaling use loopback, and the
 coordinator assigns each profile and game a stable port in 8100–8999.
 
+Select a profile and click **Rename Profile** to change its display name while
+keeping its saves and launch settings. **Delete Profile** stops that profile’s
+running games and permanently deletes all of its saves and launch settings.
+
 ## Quick check
 
 Start two games under one profile, then start one under another. Open
 each viewer and check its stream settings. Stop one game and check that the
 other games are still running. Relaunch the stopped game to check its saved
-settings and data.
+settings and data. Rename a profile and verify that it still has its saves.
+Delete a disposable profile and verify that its game volumes are gone.

@@ -74,6 +74,25 @@ async function inspectGame(profile: Profile, game: GameId): Promise<Container | 
   return container;
 }
 
+async function removeGameContainer(container: Container | undefined) {
+  if (!container) return;
+  if (container.State.Running) await command('docker', ['stop', container.Id]);
+  await command('docker', ['rm', container.Id]);
+}
+
+async function deleteProfileSaves(profile: Profile) {
+  const containers = await Promise.all(gameIds.map((game) => inspectGame(profile, game)));
+  const names = await command('docker', [
+    'volume', 'ls', '--filter', `name=containerz-small-${profile.id}-`, '--format', '{{.Name}}',
+  ]);
+  const volumes = new Set(names.split('\n'));
+  for (const container of containers) await removeGameContainer(container);
+  for (const game of gameIds) {
+    const name = containerName(profile, game);
+    if (volumes.has(name)) await command('docker', ['volume', 'rm', name]);
+  }
+}
+
 async function listGpus() {
   const directory = '/dev/dri/by-path';
   const entries = await readdir(directory).catch((error: NodeJS.ErrnoException): string[] => {
@@ -221,6 +240,20 @@ function findProfile(profiles: Profile[], id: string) {
   return profile;
 }
 
+function validateProfileName(value: unknown) {
+  const name = typeof value === 'string' ? value.trim() : '';
+  if (!name || name.length > 48 || /[\u0000-\u001f\u007f]/.test(name)) {
+    throw new RequestError(400, 'Enter a profile name of 1 to 48 characters.');
+  }
+  return name;
+}
+
+function requireUniqueProfileName(profiles: Profile[], name: string, id?: string) {
+  if (profiles.some((profile) => profile.id !== id && profile.name.toLowerCase() === name.toLowerCase())) {
+    throw new RequestError(409, 'A profile with that name already exists.');
+  }
+}
+
 export function createCoordinatorServer(dataDir = fileURLToPath(new URL('./data/', import.meta.url))) {
   const store = profileStore(dataDir);
   let lastWrite = Promise.resolve();
@@ -239,7 +272,7 @@ export function createCoordinatorServer(dataDir = fileURLToPath(new URL('./data/
 
     try {
       const path = request.url ?? '';
-      if (request.method === 'POST') {
+      if (request.method === 'POST' || request.method === 'PATCH' || request.method === 'DELETE') {
         const bound = server.address();
         const origin = bound && typeof bound === 'object' ? `http://${host}:${bound.port}` : undefined;
         if (!origin || request.headers.origin !== origin) {
@@ -259,22 +292,39 @@ export function createCoordinatorServer(dataDir = fileURLToPath(new URL('./data/
           return json(200, { profiles: profiles.map(({ id, name }) => ({ id, name })) });
         }
         if (request.method === 'POST') {
-          const data = await jsonBody(request);
-          const name = typeof data.name === 'string' ? data.name.trim() : '';
-          if (!name || name.length > 48 || /[\u0000-\u001f\u007f]/.test(name)) {
-            throw new RequestError(400, 'Enter a profile name of 1 to 48 characters.');
-          }
+          const name = validateProfileName((await jsonBody(request)).name);
           const id = await mutate(async () => {
             const profiles = await store.read();
-            if (profiles.some((profile) => profile.name.toLowerCase() === name.toLowerCase())) {
-              throw new RequestError(409, 'A profile with that name already exists.');
-            }
+            requireUniqueProfileName(profiles, name);
             const id = randomUUID();
             await store.write([...profiles, { id, name, games: {} }]);
             return id;
           });
           return json(201, { id, name });
         }
+      }
+      const profilePath = /^\/api\/profiles\/([a-f\d-]+)$/.exec(path);
+      if (profilePath && request.method === 'PATCH') {
+        const [, id] = profilePath;
+        const name = validateProfileName((await jsonBody(request)).name);
+        await mutate(async () => {
+          const profiles = await store.read();
+          const profile = findProfile(profiles, id);
+          requireUniqueProfileName(profiles, name, id);
+          profile.name = name;
+          await store.write(profiles);
+        });
+        return json(200, { id, name });
+      }
+      if (profilePath && request.method === 'DELETE') {
+        const [, id] = profilePath;
+        await mutate(async () => {
+          const profiles = await store.read();
+          const profile = findProfile(profiles, id);
+          await deleteProfileSaves(profile);
+          await store.write(profiles.filter((entry) => entry.id !== id));
+        });
+        return response.writeHead(204).end();
       }
       if (request.method === 'GET' && path === '/api/gpus') {
         const gpus = await listGpus();
@@ -300,9 +350,7 @@ export function createCoordinatorServer(dataDir = fileURLToPath(new URL('./data/
         const profile = findProfile(profiles, id);
         const container = await inspectGame(profile, game);
         if (!settings) {
-          if (!container) return;
-          if (container.State.Running) await command('docker', ['stop', container.Id]);
-          await command('docker', ['rm', container.Id]);
+          await removeGameContainer(container);
           return;
         }
         if (container) throw new RequestError(409, 'Stop this profile’s existing game before starting it again.');

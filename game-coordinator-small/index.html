@@ -46,7 +46,10 @@
       gap: .65rem;
     }
 
+    .profiles form { align-self: start; }
     .profiles form label { flex: 1 1 9rem; }
+    .profile-actions { margin-top: .65rem; }
+    #profile-error { grid-column: 1 / -1; margin: 0; }
     label { display: grid; gap: .3rem; min-width: 0; }
     label span { font-size: .9rem; font-weight: 600; }
     input, select, button, a {
@@ -63,6 +66,7 @@
     button, a { font-weight: 600; }
     button:enabled, a { cursor: pointer; }
     button:disabled, select:disabled { opacity: .6; }
+    #delete-profile { color: var(--error); }
     .play:enabled { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
@@ -81,10 +85,16 @@
   <main>
     <h1>Game coordinator</h1>
     <div class="profiles">
-      <label>
-        <span>Profile</span>
-        <select id="profile" disabled><option value="">Loading profiles…</option></select>
-      </label>
+      <div>
+        <label>
+          <span>Profile</span>
+          <select id="profile" disabled><option value="">Loading profiles…</option></select>
+        </label>
+        <div class="actions profile-actions">
+          <button type="button" id="rename-profile" disabled>Rename Profile</button>
+          <button type="button" id="delete-profile" disabled>Delete Profile</button>
+        </div>
+      </div>
       <form id="create-profile">
         <label>
           <span>New profile name</span>
@@ -92,6 +102,7 @@
         </label>
         <button type="submit">Create Profile</button>
       </form>
+      <p class="error" id="profile-error" role="alert" hidden></p>
     </div>
     <p class="muted" id="empty" hidden>Create a profile to start playing.</p>
     <p class="error" id="page-error" role="alert" hidden></p>
@@ -127,12 +138,16 @@
     const profileForm = document.querySelector('#create-profile');
     const profileName = document.querySelector('#profile-name');
     const createButton = profileForm.querySelector('button');
+    const renameButton = document.querySelector('#rename-profile');
+    const deleteButton = document.querySelector('#delete-profile');
+    const profileError = document.querySelector('#profile-error');
     const pageError = document.querySelector('#page-error');
     const empty = document.querySelector('#empty');
     const gamesPanel = document.querySelector('#games');
     const template = document.querySelector('#game-card');
     const profileStorageKey = 'containerz-profile';
     let activeProfile = '';
+    let profilePending = false;
     let gpus = [];
     let cards = new Map();
     let statusRequest = 0;
@@ -154,11 +169,30 @@
       element.hidden = !message;
     }
 
+    function updateProfileControls() {
+      profilePicker.disabled = renameButton.disabled = deleteButton.disabled = profilePending || !activeProfile;
+      profileName.disabled = createButton.disabled = profilePending;
+    }
+
+    async function changeProfile(operation) {
+      if (profilePending) return;
+      profilePending = true;
+      updateProfileControls();
+      showMessage(profileError, '');
+      try {
+        await operation();
+      } catch (error) {
+        showMessage(profileError, error.message);
+      } finally {
+        profilePending = false;
+        updateProfileControls();
+      }
+    }
+
     async function loadProfiles(preferred) {
       const { profiles } = await request('/api/profiles');
       profilePicker.replaceChildren(...profiles.map(({ id, name }) => new Option(name, id)));
       if (!profiles.length) profilePicker.add(new Option('No profiles', ''));
-      profilePicker.disabled = profiles.length === 0;
       empty.hidden = profiles.length > 0;
       const selected = profiles.some(({ id }) => id === preferred) ? preferred : profiles[0]?.id || '';
       profilePicker.value = selected;
@@ -167,8 +201,10 @@
 
     async function selectProfile(id) {
       activeProfile = id;
+      updateProfileControls();
       cards = new Map();
       gamesPanel.replaceChildren();
+      showMessage(profileError, '');
       showMessage(pageError, '');
       try { localStorage.setItem(profileStorageKey, id); } catch {}
       if (id) await refreshGames();
@@ -296,19 +332,39 @@
     }
 
     profilePicker.addEventListener('change', () => selectProfile(profilePicker.value));
-    profileForm.addEventListener('submit', async (event) => {
+    profileForm.addEventListener('submit', (event) => {
       event.preventDefault();
-      createButton.disabled = true;
-      showMessage(pageError, '');
-      try {
+      changeProfile(async () => {
         const { id } = await request('/api/profiles', 'POST', { name: profileName.value });
         profileForm.reset();
         await loadProfiles(id);
-      } catch (error) {
-        showMessage(pageError, error.message);
-      } finally {
-        createButton.disabled = false;
-      }
+      });
+    });
+    renameButton.addEventListener('click', () => {
+      const option = profilePicker.selectedOptions[0];
+      const newName = prompt('Enter a new profile name.', option.textContent);
+      if (newName === null) return;
+      changeProfile(async () => {
+        const { name } = await request(`/api/profiles/${option.value}`, 'PATCH', { name: newName });
+        option.textContent = name;
+      });
+    });
+    deleteButton.addEventListener('click', async () => {
+      const option = profilePicker.selectedOptions[0];
+      if (!confirm(`Delete “${option.textContent}”? This stops its running games and permanently deletes all of its saves.`)) return;
+      await changeProfile(async () => {
+        deleteButton.textContent = 'Deleting…';
+        gamesPanel.inert = true;
+        try {
+          await request(`/api/profiles/${option.value}`, 'DELETE');
+          await loadProfiles();
+        } finally {
+          gamesPanel.inert = false;
+          deleteButton.textContent = 'Delete Profile';
+        }
+      });
+      if (activeProfile === option.value) deleteButton.focus();
+      else (activeProfile ? profilePicker : profileName).focus();
     });
 
     try {
