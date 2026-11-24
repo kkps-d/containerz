@@ -38,7 +38,12 @@ if [[ -n ${CONTAINERZ_AGENT_PORT:-} ]]; then
             exit 1
         fi
     done
-    sed -e "s/^port = .*/port = $CONTAINERZ_AGENT_PORT\nloopback_only = true/" \
+    agent_bind=${CONTAINERZ_AGENT_BIND_ADDRESS:-127.0.0.1}
+    if [[ ! $agent_bind =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        log 'CONTAINERZ_AGENT_BIND_ADDRESS must be an IPv4 address'
+        exit 1
+    fi
+    sed -e "s/^port = .*/port = $CONTAINERZ_AGENT_PORT\nbind_address = \"$agent_bind\"/" \
         -e "s/^width_px = .*/width_px = $DISPLAY_WIDTH/" \
         -e "s/^height_px = .*/height_px = $DISPLAY_HEIGHT/" \
         /etc/containerz/agent.toml > "$agent_config"

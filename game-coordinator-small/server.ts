@@ -161,9 +161,9 @@ async function streamPort(profiles: Profile[], assigned?: number) {
   throw new RequestError(503, 'No stream ports are available.');
 }
 
-async function agentIsListening(port: number) {
+async function agentIsListening(host: string, port: number) {
   try {
-    const response = await fetch(`http://${loopback}:${port}/offer`, {
+    const response = await fetch(`http://${host}:${port}/offer`, {
       redirect: 'error',
       signal: AbortSignal.timeout(1_000),
     });
@@ -174,7 +174,7 @@ async function agentIsListening(port: number) {
   }
 }
 
-async function gameStatus(profile: Profile, game: GameId) {
+async function gameStatus(profile: Profile, game: GameId, host: string) {
   const saved = profile.games[game];
   const settings = saved
     ? { gpu: saved.gpu, resolution: saved.resolution, fps: saved.fps }
@@ -192,10 +192,11 @@ async function gameStatus(profile: Profile, game: GameId) {
   if (!saved || container.Config.Labels?.[portLabel] !== String(saved.port)) {
     return { ...details, state: 'failed', message: 'The container has no matching stream port.' };
   }
-  if (await agentIsListening(saved.port)) {
-    const address = `${loopback}:${saved.port}`;
-    const viewer = new URL(`http://${loopback}:5173`);
-    viewer.searchParams.set('localAgent', address);
+  if (await agentIsListening(host, saved.port)) {
+    const address = `${host}:${saved.port}`;
+    const viewer = new URL(`http://${host}:5173`);
+    if (host === loopback) viewer.searchParams.set('localAgent', address);
+    else viewer.searchParams.set('agentPort', String(saved.port));
     return { ...details, state: 'ready', address, viewerUrl: viewer.href };
   }
   if (Date.now() - Date.parse(container.State.StartedAt) >= 20_000) {
@@ -275,8 +276,8 @@ export function createCoordinatorServer(dataDir = fileURLToPath(new URL('./data/
       const path = request.url ?? '';
       const { localAddress, localPort } = request.socket;
       const authority = request.headers.host;
-      if (authority !== `${localAddress}:${localPort}` &&
-          !(localAddress === loopback && authority === `localhost:${localPort}`)) {
+      if (!localAddress || (authority !== `${localAddress}:${localPort}` &&
+          !(localAddress === loopback && authority === `localhost:${localPort}`))) {
         throw new RequestError(403, 'Open the game coordinator using its listening address.');
       }
       if (request.method === 'POST' || request.method === 'PATCH' || request.method === 'DELETE') {
@@ -338,7 +339,7 @@ export function createCoordinatorServer(dataDir = fileURLToPath(new URL('./data/
       const list = /^\/api\/profiles\/([a-f\d-]+)\/games$/.exec(path);
       if (request.method === 'GET' && list) {
         const profile = findProfile(await store.read(), list[1]);
-        const statuses = await Promise.all(gameIds.map((game) => gameStatus(profile, game)));
+        const statuses = await Promise.all(gameIds.map((game) => gameStatus(profile, game, localAddress)));
         return json(200, { games: statuses, resolutions, frameRates });
       }
 
@@ -378,6 +379,7 @@ export function createCoordinatorServer(dataDir = fileURLToPath(new URL('./data/
           '--stop-timeout', '15', '--ulimit', 'core=0', ...gpuArgs,
           '--env', `DISPLAY_WIDTH=${width}`, '--env', `DISPLAY_HEIGHT=${height}`,
           '--env', `DISPLAY_FPS=${settings.fps}`, '--env', `CONTAINERZ_AGENT_PORT=${port}`,
+          '--env', `CONTAINERZ_AGENT_BIND_ADDRESS=${localAddress}`,
           '--mount', `type=volume,src=${name},dst=${dataPath}`, ...gameMount, image,
         ]);
       });

@@ -106,9 +106,11 @@ filters them.
 ### Coordinator launches
 
 The [local game coordinator](../../game-coordinator-small/README.md) sets
-`CONTAINERZ_AGENT_PORT`, `DISPLAY_WIDTH`, `DISPLAY_HEIGHT`, and `DISPLAY_FPS`.
+`CONTAINERZ_AGENT_PORT`, `CONTAINERZ_AGENT_BIND_ADDRESS`, `DISPLAY_WIDTH`,
+`DISPLAY_HEIGHT`, and `DISPLAY_FPS`.
 Rebuild the streamer and game images after changing the startup script or the
-agent. Coordinator agent signaling listens on `127.0.0.1`.
+agent. Signaling listens on the coordinator's configured address, which
+defaults to `127.0.0.1`.
 
 ### Idle reconnects
 

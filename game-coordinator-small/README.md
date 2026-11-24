@@ -31,23 +31,29 @@ cd game-coordinator-small
 npm start
 ```
 
-### Test the coordinator on your LAN
+The coordinator is at `http://127.0.0.1:3000` by default.
 
-Set `CONTAINERZ_COORDINATOR_HOST` to the game host's LAN IPv4 address when
-starting the coordinator. For example, with `192.168.1.20`:
+### Play from another device on your LAN
+
+Build the streamer and game images with the current `web-remote-desktop`
+checkout. Start the viewer and coordinator on the same LAN IPv4 address. For
+example, run these from the repository root in separate terminals:
 
 ```bash
-CONTAINERZ_COORDINATOR_HOST=192.168.1.20 npm start
+npm --prefix ../web-remote-desktop/client exec -- vite --host 192.168.1.20 --port 5173 --strictPort
+CONTAINERZ_COORDINATOR_HOST=192.168.1.20 npm --prefix game-coordinator-small start
 ```
 
-Open `http://192.168.1.20:3000` from another device on your network. Use a
-trusted LAN since anyone who can reach the page can manage profiles and games.
-Open the game viewer on the game host, where the viewer and signaling listen
-on loopback.
+Open `http://192.168.1.20:3000` from the other device. **Open Viewer** uses the
+same IP for the viewer and game agent. Relaunch games started before you
+changed the bind address. Use a trusted LAN since devices that can reach the
+coordinator and agents can manage games and connect to streams.
+If the host filters traffic, allow TCP ports 3000, 5173, and the assigned game
+ports in 8100–8999, plus WebRTC UDP traffic from the test device.
 
 ## Play
 
-1. Open http://127.0.0.1:3000 and create or select a profile.
+1. Open the coordinator and create or select a profile.
 2. Pick a GPU, resolution, and frame rate on a game card, then click **Play**.
 3. Click **Open Viewer** when the game is ready. It connects in a new tab.
 4. Save and quit your Minecraft world before clicking **Stop Game**. Use
@@ -57,7 +63,7 @@ on loopback.
 Closing a viewer, switching profiles, or restarting the coordinator leaves
 running games in Docker. Launch settings are recorded in `data/profiles.json`
 and saves live in the game’s Docker volume. Stop a game before changing its
-launch settings. The viewer and agent signaling use loopback, and the
+launch settings. By default the viewer and agent signaling use loopback. The
 coordinator assigns each profile and game a stable port in 8100–8999.
 
 Select a profile and click **Rename Profile** to change its display name while
