@@ -6,11 +6,13 @@ fail() { echo "smoke-streamer: $*" >&2; exit 1; }
 image=containerz/streamer:dev
 command=()
 mounts=()
+env_args=()
 reuse_client=0
 case ${1:-} in
     --minecraft)
         image=containerz/minecraft:dev
         mounts=(--mount type=volume,src=containerz-pinecone-data,dst=/home/player/.local/share/PineconeMC)
+        env_args=(--env MINECRAFT_OFFLINE_NAME)
         shift
         ;;
     --openarena)
@@ -107,7 +109,7 @@ trap 'exit 0' INT TERM
 
 container=$(docker run -d --pull never --network host --stop-timeout 15 --ulimit core=0 \
     "${devices[@]}" --group-add "$(stat -c %g "$card")" --group-add "$(stat -c %g "$render")" \
-    "${mounts[@]}" "$image" "${command[@]}")
+    "${env_args[@]}" "${mounts[@]}" "$image" "${command[@]}")
 docker logs --follow "$container" &
 logs_pid=$!
 if [[ $reuse_client != 1 ]]; then

@@ -33,10 +33,18 @@ RUN curl --proto '=https' --tlsv1.2 -fsSL --retry 3 \
     && javac --release 8 -Xlint:all,-options -Werror -cp "$launcher_jar" -d classes EntryPoint.java VideoOptions.java \
     && jar uf "$launcher_jar" -C classes org/prismlauncher
 
+FROM containerz/base:dev AS seed
+
+RUN apt-get update && apt-get install -y --no-install-recommends python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY prepare-seed.py /build/prepare-seed.py
+RUN python3 /build/prepare-seed.py /seed
+
 FROM containerz/streamer:dev
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        openjdk-21-jre openjdk-25-jre fonts-dejavu-core libxcb-cursor0 \
+        openjdk-21-jre openjdk-25-jre fonts-dejavu-core libxcb-cursor0 python3 \
     && rm -rf /var/lib/apt/lists/* \
     && install -d -m 0700 -o player -g player \
         /home/player/.local /home/player/.local/share \
@@ -45,5 +53,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /build/squashfs-root /opt/pinecone
 COPY --from=builder /build/start-pinecone /usr/local/bin/start-pinecone
+COPY --from=seed /seed /opt/minecraft-seed
+COPY --chmod=0755 start-minecraft.py /usr/local/bin/start-minecraft
 
-CMD ["start-streamer", "env", "QT_QPA_PLATFORM=xcb", "start-pinecone"]
+CMD ["start-minecraft"]

@@ -54,6 +54,12 @@ function containerName(profile: Profile, game: GameId) {
   return `containerz-small-${profile.id}-${game}`;
 }
 
+function minecraftOfflineName({ id, name }: Profile) {
+  if (/^[A-Za-z0-9_]{3,16}$/.test(name)) return name;
+  const prefix = name.replace(/[^A-Za-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 9);
+  return `${prefix || 'Player'}_${id.slice(0, 6)}`;
+}
+
 async function inspectGame(profile: Profile, game: GameId): Promise<Container | undefined> {
   const name = containerName(profile, game);
   let metadata: string;
@@ -372,6 +378,7 @@ export function createCoordinatorServer(dataDir = fileURLToPath(new URL('./data/
         const [width, height] = resolutions[settings.resolution];
         const name = containerName(profile, game);
         const { image, dataPath } = games[game];
+        const gameEnv = game === 'minecraft' ? ['--env', `MINECRAFT_OFFLINE_NAME=${minecraftOfflineName(profile)}`] : [];
         await command('docker', [
           'run', '-d', '--name', name, '--label', `${ownerLabel}=${owner}`,
           '--label', `${profileLabel}=${id}`, '--label', `${gameLabel}=${game}`,
@@ -380,7 +387,7 @@ export function createCoordinatorServer(dataDir = fileURLToPath(new URL('./data/
           '--env', `DISPLAY_WIDTH=${width}`, '--env', `DISPLAY_HEIGHT=${height}`,
           '--env', `DISPLAY_FPS=${settings.fps}`, '--env', `CONTAINERZ_AGENT_PORT=${port}`,
           '--env', `CONTAINERZ_AGENT_BIND_ADDRESS=${localAddress}`,
-          '--mount', `type=volume,src=${name},dst=${dataPath}`, ...gameMount, image,
+          ...gameEnv, '--mount', `type=volume,src=${name},dst=${dataPath}`, ...gameMount, image,
         ]);
       });
 

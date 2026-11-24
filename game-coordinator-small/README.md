@@ -56,7 +56,11 @@ ports in 8100–8999, plus WebRTC UDP traffic from the test device.
 1. Open the coordinator and create or select a profile.
 2. Pick a GPU, resolution, and frame rate on a game card, then click **Play**.
 3. Click **Open Viewer** when the game is ready. It connects in a new tab.
-4. Save and quit your Minecraft world before clicking **Stop Game**. Use
+4. Minecraft opens at the 26.3 title screen. Choose **Singleplayer** to create a
+   world. The offline username follows the profile name when it fits Minecraft's
+   3–16 character limit and uses only ASCII letters, digits, or underscores. Other names
+   are converted to a stable Minecraft username.
+5. Save and quit your Minecraft world before clicking **Stop Game**. Use
    Relative mouse mode for OpenArena. In HoloCure, use WASD and left-click
    during a stage to toggle mouse aiming.
 

@@ -48,7 +48,7 @@ static void repaint_pinecone(Display *display)
     XFlush(display);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
     pid_t launcher = getpid();
     pid_t repaint = fork();
@@ -74,8 +74,13 @@ int main(void)
         }
     }
 
-    const char *app_run = "/opt/pinecone/AppRun";
-    execl(app_run, app_run, "--dir", "/home/player/.local/share/PineconeMC", (char *)NULL);
+    char *app_run = "/opt/pinecone/AppRun";
+    char *arguments[argc + 3];
+    arguments[0] = app_run;
+    arguments[1] = "--dir";
+    arguments[2] = "/home/player/.local/share/PineconeMC";
+    memcpy(arguments + 3, argv + 1, argc * sizeof(*argv));
+    execv(app_run, arguments);
     perror("start-pinecone: AppRun");
     return EXIT_FAILURE;
 }
