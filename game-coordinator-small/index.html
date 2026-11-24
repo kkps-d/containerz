@@ -128,7 +128,6 @@
       </form>
       <div class="viewer" hidden>
         <a target="_blank" rel="noopener">Open Viewer</a>
-        <code class="muted"></code>
       </div>
       <p class="muted save-tip" hidden>Save and quit your world before stopping Minecraft.</p>
     </article>
@@ -289,7 +288,6 @@
       card.saveTip.hidden = !game.id.startsWith('minecraft') || game.state !== 'ready';
       if (game.viewerUrl) {
         card.viewer.querySelector('a').href = game.viewerUrl;
-        card.viewer.querySelector('code').textContent = game.address;
       }
     }
 

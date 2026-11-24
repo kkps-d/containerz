@@ -184,7 +184,7 @@ async function gameStatus(profile: Profile, game: GameId, host: string) {
   const saved = profile.games[game];
   const settings = saved
     ? { gpu: saved.gpu, resolution: saved.resolution, fps: saved.fps }
-    : { gpu: null, resolution: '720p', fps: 60 };
+    : { gpu: null, resolution: '1080p', fps: 60 };
   const details = { id: game, title: games[game].title, settings };
   const container = await inspectGame(profile, game).catch((error: unknown) => {
     if (error instanceof RequestError && error.status === 409) return error;
@@ -200,7 +200,7 @@ async function gameStatus(profile: Profile, game: GameId, host: string) {
   }
   if (await agentIsListening(host, saved.port)) {
     const address = `${host}:${saved.port}`;
-    const viewer = new URL(`http://${host}:5173`);
+    const viewer = new URL(`http://${host}:5173/play/`);
     if (host === loopback) viewer.searchParams.set('localAgent', address);
     else viewer.searchParams.set('agentPort', String(saved.port));
     return { ...details, state: 'ready', address, viewerUrl: viewer.href };

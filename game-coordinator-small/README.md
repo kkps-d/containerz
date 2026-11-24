@@ -55,16 +55,23 @@ ports in 8100–8999, plus WebRTC UDP traffic from the test device.
 ## Play
 
 1. Open the coordinator and create or select a profile.
-2. Pick a GPU, resolution, and frame rate on a game card, then click **Play**.
-3. Click **Open Viewer** when the game is ready. It connects in a new tab.
+2. Pick a GPU on a game card and click **Play**. New configurations default to
+   1080p at 60 fps. You can change the resolution and frame rate before launch.
+3. Click **Open Viewer** when the game is ready. It connects in a new tab at
+   `/play/`. Click the stream to capture the mouse and press Esc to release it
+   and send Esc to the game. Touch works as a trackpad.
 4. **Minecraft 26.3** and **Minecraft 1.21.11** open at their title screens and
    keep separate saves. Choose **Singleplayer** to create a world. The offline
    username follows the profile name when it fits Minecraft's 3–16 character
    limit and uses only ASCII letters, digits, or underscores. Other names are
    converted to a stable Minecraft username.
-5. Save and quit your Minecraft world before clicking **Stop Game**. Use
-   Relative mouse mode for OpenArena. In HoloCure, use WASD and left-click
-   during a stage to toggle mouse aiming.
+5. Save and quit your Minecraft world before clicking **Stop Game**. In
+   HoloCure, use WASD and left-click during a stage to toggle mouse aiming.
+
+The viewer starts at Medium. Choose Low (480p60 at 4 Mbps), Medium (720p60 at
+8 Mbps), or High (1080p60 at 12 Mbps). The viewer caps the preset to the
+running game's stream limits. Changing quality leaves the game's display mode
+as set at launch.
 
 Closing a viewer, switching profiles, or restarting the coordinator leaves
 running games in Docker. Launch settings are recorded in `data/profiles.json`
