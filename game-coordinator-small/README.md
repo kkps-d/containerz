@@ -31,6 +31,20 @@ cd game-coordinator-small
 npm start
 ```
 
+### Test the coordinator on your LAN
+
+Set `CONTAINERZ_COORDINATOR_HOST` to the game host's LAN IPv4 address when
+starting the coordinator. For example, with `192.168.1.20`:
+
+```bash
+CONTAINERZ_COORDINATOR_HOST=192.168.1.20 npm start
+```
+
+Open `http://192.168.1.20:3000` from another device on your network. Use a
+trusted LAN since anyone who can reach the page can manage profiles and games.
+Open the game viewer on the game host, where the viewer and signaling listen
+on loopback.
+
 ## Play
 
 1. Open http://127.0.0.1:3000 and create or select a profile.

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { access, readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage } from 'node:http';
+import { isIPv4 } from 'node:net';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -12,7 +13,7 @@ import {
   type GameId, type Profile, type Settings,
 } from './profiles.ts';
 
-const host = '127.0.0.1';
+const loopback = '127.0.0.1';
 const port = 3000;
 const ownerLabel = 'io.containerz.game-coordinator';
 const profileLabel = 'io.containerz.profile';
@@ -162,7 +163,7 @@ async function streamPort(profiles: Profile[], assigned?: number) {
 
 async function agentIsListening(port: number) {
   try {
-    const response = await fetch(`http://${host}:${port}/offer`, {
+    const response = await fetch(`http://${loopback}:${port}/offer`, {
       redirect: 'error',
       signal: AbortSignal.timeout(1_000),
     });
@@ -192,8 +193,8 @@ async function gameStatus(profile: Profile, game: GameId) {
     return { ...details, state: 'failed', message: 'The container has no matching stream port.' };
   }
   if (await agentIsListening(saved.port)) {
-    const address = `${host}:${saved.port}`;
-    const viewer = new URL(`http://${host}:5173`);
+    const address = `${loopback}:${saved.port}`;
+    const viewer = new URL(`http://${loopback}:5173`);
     viewer.searchParams.set('localAgent', address);
     return { ...details, state: 'ready', address, viewerUrl: viewer.href };
   }
@@ -272,10 +273,14 @@ export function createCoordinatorServer(dataDir = fileURLToPath(new URL('./data/
 
     try {
       const path = request.url ?? '';
+      const { localAddress, localPort } = request.socket;
+      const authority = request.headers.host;
+      if (authority !== `${localAddress}:${localPort}` &&
+          !(localAddress === loopback && authority === `localhost:${localPort}`)) {
+        throw new RequestError(403, 'Open the game coordinator using its listening address.');
+      }
       if (request.method === 'POST' || request.method === 'PATCH' || request.method === 'DELETE') {
-        const bound = server.address();
-        const origin = bound && typeof bound === 'object' ? `http://${host}:${bound.port}` : undefined;
-        if (!origin || request.headers.origin !== origin) {
+        if (request.headers.origin !== `http://${authority}`) {
           throw new RequestError(403, 'Use the game coordinator page to manage profiles and games.');
         }
       }
@@ -389,6 +394,11 @@ export function createCoordinatorServer(dataDir = fileURLToPath(new URL('./data/
 }
 
 if (import.meta.main) {
+  const host = process.env.CONTAINERZ_COORDINATOR_HOST || loopback;
+  if (!isIPv4(host) || host === '0.0.0.0') {
+    console.error('CONTAINERZ_COORDINATOR_HOST must be a specific IPv4 address on this machine.');
+    process.exit(1);
+  }
   const server = createCoordinatorServer();
   const origin = `http://${host}:${port}`;
   server.on('error', (error) => {
