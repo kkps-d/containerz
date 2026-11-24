@@ -43,10 +43,8 @@ and enables **VSync** and **Fullscreen**. The coordinator passes the FPS selecte
 on the game card. Standalone launches use 60 fps by default. These settings are
 applied again when you relaunch an instance from PineconeMC.
 
-If Minecraft 26.3 runs at about 10 fps in fullscreen, press **F11** to switch
-to windowed mode. SDL waits for an XWayland fullscreen state that Gamescope
-doesn't publish. At 1080p60, switching to windowed mode restored 60 fps on
-both the RTX 5080 and the AMD Raphael iGPU.
+For the Minecraft 26.3 fullscreen fix, rebuild the display and streamer images
+before rebuilding Minecraft. [Display build](../display/README.md#build)
 
 Save and quit your world before pressing Ctrl+C in the smoke launcher to stop
 the container and browser client. Docker volumes persist launcher settings,

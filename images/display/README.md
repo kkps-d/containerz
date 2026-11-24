@@ -16,9 +16,10 @@ docker build -t containerz/base:dev images/base
 docker build -t containerz/display:dev images/display
 ```
 
-The builder stage patches Ubuntu's gamescope package with the PipeWire loop
-fix and optional cursor capture. The streamer image enables cursor control
-when the game's policy allows it. [Streamer cursor policy](../streamer/README.md#cursor-policy)
+The builder stage patches Ubuntu's pinned Gamescope 3.16.20 package with the
+PipeWire loop fix, optional cursor capture, and an XWayland fix that publishes
+fullscreen state to clients. The streamer image enables cursor control when
+the game's policy allows it. [Upstream fullscreen fix](https://github.com/ValveSoftware/gamescope/commit/5f071dcc60d8f96b0ef80f7c5ef5d181a6309ff9) · [Streamer cursor policy](../streamer/README.md#cursor-policy)
 
 ## Run on NVIDIA
 
